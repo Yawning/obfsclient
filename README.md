@@ -47,6 +47,7 @@ In your torrc:
 
     UseBridges 1
     Bridge obfs2 ip:port fingerprint
+    Bridge obfs3 ip:port fingerprint
     ClientTransportPlugin obfs2,obfs3 exec /path/to/the/binary/obfsclient
 
 ### Implementation notes
