@@ -160,7 +160,7 @@ void Obfs3Client::on_outgoing_data() {
                                    responder_magic_.size(), nullptr);
     if (found.pos == -1)
       return;
-    if (found.pos > static_cast<ssize_t>(kMaxPadding)) {
+    if (found.pos > static_cast<ssize_t>(kMaxPadding + 1)) {
       delete this;
       return;
     }
