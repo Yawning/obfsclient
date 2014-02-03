@@ -31,7 +31,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <algorithm>
 #include <cstring>
 
 #include "schwanenlied/crypto/aes_ctr128.h"
