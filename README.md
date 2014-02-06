@@ -1,4 +1,4 @@
-## obfsclient  - A C++11 obfs2/3 Tor managed pluggable transport client
+## obfsclient - A C++11 obfs2/3 Tor managed pluggable transport client
 #### Yawning Angel (yawning at schwanenlied dot me)
 
 > Compile this if you are a obfuscated strong proxy
@@ -59,10 +59,10 @@ because that's realistically the only safe thing to do.
 
 Caveats:
 
- * My UniformDH implementation is not constant time.  I do not view this as a
-   huge problem, since neither is the the Python implementation in production
-   today, and the cryptographic components for obfs3 are intended as
-   obfuscation.
+ * My UniformDH implementation is not quite constant time, though the modular
+   exponentiation is.  I do not belive that this is a problem since the
+   cryptographic components of obfs3 are intended for obfuscation and not
+   secrecy.
  * The UniformDH implementation is glacially slow.  I may be spoiled by using
    Curve25519 so much lately.
  * IPv6 is unsupported, even though it could be if I used SOCKSv5.

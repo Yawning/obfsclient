@@ -34,8 +34,9 @@
 #ifndef SCHWANENLIED_CRYPTO_UNIFORM_DH_H__
 #define SCHWANENLIED_CRYPTO_UNIFORM_DH_H__
 
-#include <openssl/bn.h>
 #include <string>
+
+#include <openssl/dh.h>
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/crypto/utils.h"
@@ -47,10 +48,8 @@ namespace crypto {
  * UniformDH key exchange
  *
  * This is a implementation of the UniformDH key exchange protocol as specified
- * in the obfs3 spec.
- *
- * @bug One day this should at least make an effort to be something vaguely
- * resembling constant time.
+ * in the obfs3 spec.  It uses OpenSSL's DH code for the modular exponentiation,
+ * which is "constant time" for OpenSSL >= 0.9.7h.
  */
 class UniformDH {
  public:
@@ -93,10 +92,8 @@ class UniformDH {
   UniformDH(const UniformDH&) = delete;
   void operator=(const UniformDH&) = delete;
 
-  BN_CTX* ctx_;                 /**< The BN context used for BN_mod_exp */
-  BIGNUM* private_key_;         /**< The private key */
+  DH* ctx_;                     /**< The DH context */
   ::std::string public_key_;    /**< The serialized form of the public key */
-
   bool has_shared_secret_;      /**< Is a valid hared secret present? */
   SecureBuffer shared_secret_;  /**< The shared secret */
 };

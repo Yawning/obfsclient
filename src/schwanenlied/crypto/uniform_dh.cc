@@ -31,14 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <mutex>
+#include <openssl/bn.h>
 
 #include "schwanenlied/crypto/uniform_dh.h"
 
 namespace schwanenlied {
 namespace crypto {
-
-static ::std::once_flag load_params;
 
 static const unsigned char rfc3526_group_5_p[] = {
   // FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1
@@ -78,27 +76,23 @@ static const unsigned char rfc3526_group_5_g[] = {
  0x02
 };
 
-static BIGNUM* uniform_dh_p = nullptr;
-static BIGNUM* uniform_dh_g = nullptr;
-
 UniformDH::UniformDH() :
-    ctx_(::BN_CTX_new()),
-    private_key_(::BN_new()),
+    ctx_(::DH_new()),
     public_key_(kKeySz, 0),
     has_shared_secret_(false),
     shared_secret_(kKeySz, 0) {
-  SL_ASSERT(private_key_ != nullptr);
   SL_ASSERT(ctx_ != nullptr);  
 
-  // Load the UniformDH MODP group
-  ::std::call_once(load_params, []() {
-    uniform_dh_p = ::BN_bin2bn(rfc3526_group_5_p, sizeof(rfc3526_group_5_p),
-                               NULL);
-    uniform_dh_g = ::BN_bin2bn(rfc3526_group_5_g, sizeof(rfc3526_group_5_g),
-                               NULL);
-    SL_ASSERT(uniform_dh_p != nullptr);
-    SL_ASSERT(uniform_dh_g != nullptr);
-  });
+  /* Create the DH context */
+  ctx_->p = ::BN_bin2bn(rfc3526_group_5_p, sizeof(rfc3526_group_5_p),
+                        nullptr);
+  ctx_->g = ::BN_bin2bn(rfc3526_group_5_g, sizeof(rfc3526_group_5_g),
+                        nullptr);
+  ctx_->priv_key = ::BN_new();
+  SL_ASSERT(ctx_->p != nullptr);
+  SL_ASSERT(ctx_->g != nullptr);
+  SL_ASSERT(ctx_->priv_key != nullptr);
+  SL_ASSERT(::DH_size(ctx_) == kKeySz);
 
   /*
    * To pick a private UniformDH key, we pick a random 1536-bit number,
@@ -106,41 +100,34 @@ UniformDH::UniformDH() :
    * key, and X = g^x (mod p).
    */
 
-  int ret = ::BN_rand(private_key_, kKeySz * 8, -1, 0);
+  int ret = ::BN_rand(ctx_->priv_key, kKeySz * 8, -1, 0);
   SL_ASSERT(ret == 1);
-  const bool is_odd = BN_is_odd(private_key_);
-  ret = ::BN_clear_bit(private_key_, 0);
+  const bool is_odd = BN_is_odd(ctx_->priv_key);
+  ret = ::BN_clear_bit(ctx_->priv_key, 0);
   SL_ASSERT(ret == 1);
 
-  // Calculate X = g^x (mod p)
-  BIGNUM* pub_key = ::BN_new();
-  SL_ASSERT(pub_key != nullptr);
-  ret = ::BN_mod_exp(pub_key, uniform_dh_g, private_key_, uniform_dh_p,
-                     ctx_);
+  ret = ::DH_generate_key(ctx_);
   SL_ASSERT(ret == 1);
   if (is_odd) {
     // Calculate X = p - X
     BIGNUM* p_sub_X  = ::BN_new();
     SL_ASSERT(p_sub_X != nullptr);
-    ret = ::BN_sub(p_sub_X, uniform_dh_p, pub_key);
+    ret = ::BN_sub(p_sub_X, ctx_->p, ctx_->pub_key);
     SL_ASSERT(ret == 1);
-    BN_free(pub_key);
-    pub_key = p_sub_X;
+    ::BN_free(ctx_->pub_key);
+    ctx_->pub_key = p_sub_X;
   }
 
   // Only need the public key that's going to be sent
-  const int offset = public_key_.size() - BN_num_bytes(pub_key);
-  ret = ::BN_bn2bin(pub_key, reinterpret_cast<unsigned
+  const int offset = public_key_.size() - BN_num_bytes(ctx_->pub_key);
+  ret = ::BN_bn2bin(ctx_->pub_key, reinterpret_cast<unsigned
                     char*>(&public_key_[offset]));
   SL_ASSERT(ret + offset == kKeySz); 
-
-  BN_free(pub_key);
 }
 
 UniformDH::~UniformDH() {
-  BN_CTX_free(ctx_);
-  if (private_key_ != nullptr)
-    BN_clear_free(private_key_);
+  if (ctx_ != nullptr)
+    ::DH_free(ctx_);
 }
 
 bool UniformDH::compute_key(const uint8_t* pub_key,
@@ -151,7 +138,7 @@ bool UniformDH::compute_key(const uint8_t* pub_key,
     return false;
   SL_ASSERT(has_shared_secret_ == false);
 
-  BIGNUM* peer_public_key = ::BN_bin2bn(pub_key, len, NULL);
+  BIGNUM* peer_public_key = ::BN_bin2bn(pub_key, len, nullptr);
   if (peer_public_key == nullptr)
     return false;
 
@@ -162,31 +149,23 @@ bool UniformDH::compute_key(const uint8_t* pub_key,
    * even.
    *
    * Notes:
-   *  * The spec says to just raise it, but the obfsproxy code does
-   *    Y^x (mod p).
-   *  * This is nothing even vaguely resembling constant time, but
-   *    neither is obfsproxy.  This *should* use BN_BLINDING, however all of the
-   *    encryption used for obfs3 is "as an obfuscation mechanism".  Someone
-   *    running a timing attack to extract the keys means that we've lost
-   *    already.
+   *  * The spec says to just raise it, but the python code does Y^x (mod p)
+   *  * Since OpenSSL doesn't have a routine for creating a DH shared secret
+   *    that's a fixed size, this potentially leaks timing information when
+   *    storing the shared secret.
    */
 
-  BIGNUM* secret = ::BN_new();
-  SL_ASSERT(secret != nullptr);
-  int ret = ::BN_mod_exp(secret, peer_public_key, private_key_, uniform_dh_p,
-                         ctx_);
-  if (ret == 1) {
-    const int offset = shared_secret_.size() - BN_num_bytes(secret);
-    ret = ::BN_bn2bin(secret, reinterpret_cast<unsigned
-                      char*>(&shared_secret_[offset]));
-    SL_ASSERT(ret + offset == kKeySz);
-    BN_clear_free(private_key_);
-    private_key_ = nullptr;
+  int sz = ::DH_compute_key(&shared_secret_[0], peer_public_key, ctx_);
+  if (sz > 0 && sz <= static_cast<int>(shared_secret_.size())) {
+    const int offset = shared_secret_.size() - sz;
+    shared_secret_.resize(sz);
+    shared_secret_.insert(0, offset, 0); // Ugh......
+    ::DH_free(ctx_);
+    ctx_ = nullptr;
     has_shared_secret_ = true;
   }
 
-  BN_clear_free(secret);
-  BN_free(peer_public_key);
+  ::BN_free(peer_public_key);
 
   return has_shared_secret_;
 }
