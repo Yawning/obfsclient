@@ -34,7 +34,7 @@
 #ifndef SCHWANENLIED_CRYPTO_AES_CTR128_H__
 #define SCHWANENLIED_CRYPTO_AES_CTR128_H__
 
-#include <openssl/aes.h>
+#include <openssl/evp.h>
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/crypto/utils.h"
@@ -48,8 +48,8 @@ namespace crypto {
  * Apparently assuming that OpenSSL implements AES-CTR is a mistake, so this
  * provides AES-CTR assuming that AES-ECB is available.
  *
- * @bug This should use the EVP interface and EVP_aes_128_ctr(), assuming that
- * said interface lets us actually use a 128 bit counter.
+ * @todo In theory OpenSSL >= 1.0.1 should have EVP_aes_128_ctr() and it
+ * should be used if it is available.
  */
 class AesCtr128 {
  public:
@@ -61,11 +61,7 @@ class AesCtr128 {
   /**
    * Create a new AES-CTR-128 instance
    */
-  AesCtr128() :
-      has_state_(false),
-      ctr_(kMaxCtrLength, 0),
-      block_(kBlockLength, 0),
-      offset_(0) {}
+  AesCtr128();
 
   ~AesCtr128();
 
@@ -122,7 +118,7 @@ class AesCtr128 {
   SecureBuffer block_;  /**< The ECB encrypted counter */
   size_t offset_;       /**< The offset into the counter */
 
-  AES_KEY key_;         /**< The OpenSSL AES key */
+  EVP_CIPHER_CTX ctx_;  /**< The OpenSSL EVP context */
 };
 
 } // namespace crypto

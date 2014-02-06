@@ -38,8 +38,17 @@
 namespace schwanenlied {
 namespace crypto {
 
+AesCtr128::AesCtr128() :
+    has_state_(false),
+    ctr_(kMaxCtrLength, 0),
+    block_(kBlockLength, 0),
+    offset_(0) {
+  ::EVP_CIPHER_CTX_init(&ctx_);
+  ::EVP_CIPHER_CTX_set_padding(&ctx_, 0);
+}
+
 AesCtr128::~AesCtr128() {
-  memwipe(&key_, sizeof(key_));
+  ::EVP_CIPHER_CTX_cleanup(&ctx_);
 }
 
 bool AesCtr128::set_state(const SecureBuffer& key,
@@ -54,8 +63,9 @@ bool AesCtr128::set_state(const SecureBuffer& key,
 
   clear_state();
 
-  // Setup the key
-  if (0 != ::AES_set_encrypt_key(key.data(), kKeyLength * 8, &key_))
+  // Initialize the AES ctxt
+  if (1 != ::EVP_EncryptInit_ex(&ctx_, ::EVP_aes_128_ecb(), NULL, key.data(),
+                                NULL))
     return false;
 
   // Initialize the counter
@@ -69,10 +79,10 @@ bool AesCtr128::set_state(const SecureBuffer& key,
 
 void AesCtr128::clear_state() {
   if (has_state_) {
+    ::EVP_CIPHER_CTX_cleanup(&ctx_);
     ::std::fill(ctr_.begin(), ctr_.end(), 0);
     ::std::fill(block_.begin(), block_.end(), 0);
     offset_ = 0;
-    memwipe(&key_, sizeof(key_));
     has_state_ = false;
   }
 }
@@ -91,7 +101,13 @@ bool AesCtr128::process(const uint8_t* buf,
 
   for (size_t i = len; i > 0; i--) {
     if (offset_ == 0) {
-      ::AES_ecb_encrypt(ctr_.data(), &block_[0], &key_, AES_ENCRYPT);
+      int outl = block_.size();
+      if (1 != ::EVP_EncryptUpdate(&ctx_, &block_[0], &outl, ctr_.data(),
+                                   ctr_.size()))
+        return false;
+      if (1 != ::EVP_EncryptFinal_ex(&ctx_, &block_[outl], &outl))
+        return false;
+
       for (auto j = ctr_.rbegin(); j != ctr_.rend(); ++j)
         if (++*j != 0)
          break;
