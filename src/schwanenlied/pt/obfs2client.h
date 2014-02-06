@@ -95,7 +95,6 @@ class Obfs2Client : public Socks4Server::Session {
   static const uint32_t kMagicValue = 0x2BF5CA7E; /**< obfs2 MAGIC_VALUE */
   static const size_t kSeedLength = 16;           /**< obfs2 SEED_LENGTH */
   static const size_t kMaxPadding = 8192;         /**< obfs2 MAX_PADDING */
-  static const int kHashIterations = 100000;      /**< obfs2 HASH_ITERATIONS */
   /** @} */
 
   /** @{ */

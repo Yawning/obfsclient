@@ -60,7 +60,6 @@ class Sha256 {
    * @param[out]  out     A pointer to where the digest should be stored
    * @param[in]   out_len The length of the memory at out (Must be
    *                      kDigestLength)
-   * @param[in]   iters   The number of iterations to calculate
    *
    * @returns true  - Success
    * @returns false - Failure
@@ -68,8 +67,7 @@ class Sha256 {
   bool digest(const uint8_t* buf,
               const size_t len,
               uint8_t* out,
-              const size_t out_len,
-              const int iters = 1) const;
+              const size_t out_len) const;
 };
 
 } // namespace crypto

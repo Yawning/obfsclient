@@ -41,8 +41,7 @@ namespace crypto {
 bool Sha256::digest(const uint8_t* buf,
                     const size_t len,
                     uint8_t* out,
-                    const size_t out_len,
-                    const int iters) const {
+                    const size_t out_len) const {
   if (buf == nullptr)
     return false;
   if (len == 0)
@@ -50,8 +49,6 @@ bool Sha256::digest(const uint8_t* buf,
   if (out == nullptr)
     return false;
   if (out_len != kDigestLength)
-    return false;
-  if (iters <= 0)
     return false;
 
   EVP_MD_CTX* ctx = ::EVP_MD_CTX_create();
@@ -66,14 +63,6 @@ bool Sha256::digest(const uint8_t* buf,
     goto out;
   if (1 != ::EVP_DigestFinal(ctx, out, &s))
     goto out;
-  for (auto i = 1; i < iters; i++) {
-    if (1 != ::EVP_DigestInit_ex(ctx, ::EVP_sha256(), NULL))
-      goto out;
-    if (1 != ::EVP_DigestUpdate(ctx, out, out_len))
-      goto out;
-    if (1 != ::EVP_DigestFinal(ctx, out, &s))
-      goto out;
-  }
   ret = true;
 
 out:
