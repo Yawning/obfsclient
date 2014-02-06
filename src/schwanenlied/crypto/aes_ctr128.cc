@@ -64,8 +64,8 @@ bool AesCtr128::set_state(const SecureBuffer& key,
   clear_state();
 
   // Initialize the AES ctxt
-  if (1 != ::EVP_EncryptInit_ex(&ctx_, ::EVP_aes_128_ecb(), NULL, key.data(),
-                                NULL))
+  if (1 != ::EVP_EncryptInit_ex(&ctx_, ::EVP_aes_128_ecb(), nullptr, key.data(),
+                                nullptr))
     return false;
 
   // Initialize the counter

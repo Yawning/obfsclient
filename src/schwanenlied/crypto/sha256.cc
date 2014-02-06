@@ -57,7 +57,7 @@ bool Sha256::digest(const uint8_t* buf,
 
   bool ret = false;
   unsigned int s = out_len;
-  if (1 != ::EVP_DigestInit_ex(ctx, ::EVP_sha256(), NULL))
+  if (1 != ::EVP_DigestInit_ex(ctx, ::EVP_sha256(), nullptr))
     goto out;
   if (1 != ::EVP_DigestUpdate(ctx, buf, len))
     goto out;
