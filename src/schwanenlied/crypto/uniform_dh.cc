@@ -140,7 +140,7 @@ UniformDH::UniformDH() :
 UniformDH::~UniformDH() {
   BN_CTX_free(ctx_);
   if (private_key_ != nullptr)
-    BN_free(private_key_);
+    BN_clear_free(private_key_);
 }
 
 bool UniformDH::compute_key(const uint8_t* pub_key,
@@ -180,12 +180,12 @@ bool UniformDH::compute_key(const uint8_t* pub_key,
     ret = ::BN_bn2bin(secret, reinterpret_cast<unsigned
                       char*>(&shared_secret_[offset]));
     SL_ASSERT(ret + offset == kKeySz);
-    BN_free(private_key_);
+    BN_clear_free(private_key_);
     private_key_ = nullptr;
     has_shared_secret_ = true;
   }
 
-  BN_free(secret);
+  BN_clear_free(secret);
   BN_free(peer_public_key);
 
   return has_shared_secret_;
