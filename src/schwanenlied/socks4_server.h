@@ -137,6 +137,7 @@ class Socks4Server {
     struct bufferevent* incoming_;
     /** The SOCKS Server to Remote peer bufferevent */
     struct bufferevent* outgoing_;
+    /** The remote peer's address */
     struct sockaddr_in remote_addr_;
 
     /** The SOCKSv4 session state */
