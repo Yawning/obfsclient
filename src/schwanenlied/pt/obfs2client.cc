@@ -78,11 +78,6 @@ out_error:
    * The spec says I send:
    *  * INIT_SEED
    *  * E(INIT_PAD_KEY, UINT32(MAGIC_VALUE) | UINT32(PADLEN) | WR(PADLEN))
-   *
-   * Note:
-   * We cheat and don't bother encrypting the padding since it's random data and
-   * utterly ignored.  AES-CTR-128 is a better PRF than libevent's PRNG, but
-   * there are easier distinguishing attacks on this protocol anyway.
    */
 
   // Generate the encrypted data
@@ -111,6 +106,9 @@ out_error:
   if (padlen > 0) {
     uint8_t padding[kMaxPadding];
     ::evutil_secure_rng_get_bytes(padding, padlen);
+
+    if (!initiator_aes_.process(padding, padlen, padding))
+      goto out_error;
 
     ret = ::bufferevent_write(outgoing_, padding, padlen);
     if (ret != 0)
