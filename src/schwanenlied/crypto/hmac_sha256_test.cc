@@ -148,6 +148,27 @@ TEST_F(HmacSha256Test, RFC4231_Case_4) {
 
 // Case 5 (Output truncated to 128 bits) - Skipped, class always provides full
 // digest
+TEST_F(HmacSha256Test, RFC4231_Case_5) {
+  // Test with a truncation of output to 128 bits.
+  const uint8_t key[] = {
+    0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c,
+    0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c, 0x0c
+  };
+  const uint8_t data[] = {
+    0x54, 0x65, 0x73, 0x74, 0x20, 0x57, 0x69, 0x74, 0x68, 0x20,
+    0x54, 0x72, 0x75, 0x6e, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e             
+  };
+  const uint8_t expected[] = {
+    0xa3, 0xb6, 0x16, 0x74, 0x73, 0x10, 0x0e, 0xe0, 0x6e, 0x0c,
+    0x79, 0x6c, 0x29, 0x55, 0x55, 0x2b
+  };
+
+  SecureBuffer digest(sizeof(expected), 0);
+  HmacSha256 instance(SecureBuffer(key, sizeof(key)));
+  bool ret = instance.digest(data, sizeof(data), &digest[0], digest.size());
+  ASSERT_TRUE(ret);
+  ASSERT_EQ(0, digest.compare(SecureBuffer(expected, sizeof(expected))));
+}
 
 TEST_F(HmacSha256Test, RFC4231_Case_6) {
   // Test with a key larger than 128 bytes (= block-size of SHA-384 and

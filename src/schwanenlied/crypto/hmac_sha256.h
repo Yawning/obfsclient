@@ -64,7 +64,7 @@ class HmacSha256 {
    * @param[in]   buf     A pointer to the buffer to be HMACed
    * @param[in]   len     The size of the buffer to be HMACed
    * @param[out]  out     A pointer to where the digest should be stored
-   * @param[in]   out_len The length of the memory at out (Must be
+   * @param[in]   out_len The length of the memory at out (Must be <=
    *                      kDigestLength)
    *
    * @returns true  - Success

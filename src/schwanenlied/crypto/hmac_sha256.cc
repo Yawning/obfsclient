@@ -31,6 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <cstring>
+
 #include <openssl/hmac.h>
 
 #include "schwanenlied/crypto/hmac_sha256.h"
@@ -48,14 +50,21 @@ bool HmacSha256::digest(const uint8_t* buf,
     return false;
   if (out == nullptr)
     return false;
-  if (out_len != kDigestLength)
+  if (out_len > kDigestLength)
     return false;
-
-  unsigned int digest_len = out_len;
-  (void)::HMAC(::EVP_sha256(), key_.data(), key_.size(), buf, len, out,
-               &digest_len);
-  
-  return (digest_len == out_len);
+  else if (out_len == kDigestLength) {
+    unsigned int digest_len = out_len;
+    (void)::HMAC(::EVP_sha256(), key_.data(), key_.size(), buf, len, out,
+                 &digest_len);
+    return (digest_len == out_len);
+  } else {
+    uint8_t digest[kDigestLength] = { 0 };
+    unsigned int digest_len = kDigestLength;
+    (void)::HMAC(::EVP_sha256(), key_.data(), key_.size(), buf, len, digest,
+                 &digest_len);
+    ::std::memcpy(out, digest, out_len);
+    return (digest_len == kDigestLength);
+  }
 }
 
 } // namespace crypto
