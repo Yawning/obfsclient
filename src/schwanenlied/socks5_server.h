@@ -87,7 +87,7 @@ class Socks5Server {
      * @param[in] sock          The Client to SOCKS server socket
      * @param[in] addr          The address of the client
      * @param[in] addr_len      The length of the sockaddr pointed to by addr
-     * @param[in] requre_auth   Authentication is required?
+     * @param[in] require_auth  Authentication is required?
      */
     Session(struct event_base* base,
             const evutil_socket_t sock,

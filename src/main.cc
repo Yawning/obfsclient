@@ -108,7 +108,7 @@ out_free_obfs3:
 
     ::allium_ptcfg_cmethod_report(cfg, kObfs3MethodName, 5,
                                   reinterpret_cast<struct sockaddr*>(&socks_addr),
-                                  sizeof(socks_addr), NULL, NULL);
+                                  sizeof(socks_addr), nullptr, nullptr);
   }
 
   // Attempt to configure obfs2
@@ -141,7 +141,7 @@ out_free_obfs2:
 
     ::allium_ptcfg_cmethod_report(cfg, kObfs2MethodName, 5,
                                   reinterpret_cast<struct sockaddr*>(&socks_addr),
-                                  sizeof(socks_addr), NULL, NULL);
+                                  sizeof(socks_addr), nullptr, nullptr);
   }
 
   // Done with the config!
