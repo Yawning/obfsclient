@@ -77,24 +77,13 @@ class Obfs3Client : public Socks5Server::Session {
   ~Obfs3Client() = default;
 
  protected:
-  bool on_client_authenticate(const uint8_t* uname,
-                              const uint8_t ulen,
-                              const uint8_t* passwd,
-                              const uint8_t plen) override {
-    return true;
-  }
-
   void on_outgoing_connected() override;
 
   void on_incoming_data() override;
 
-  void on_incoming_drained() override;
-
   void on_outgoing_data_connecting() override;
 
   void on_outgoing_data() override;
-
-  void on_outgoing_drained() override;
 
  private:
   Obfs3Client(const Obfs3Client&) = delete;

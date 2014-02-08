@@ -111,10 +111,6 @@ void Obfs3Client::on_incoming_data() {
   ::evbuffer_drain(buf, len);
 }
 
-void Obfs3Client::on_incoming_drained() {
-  // Nothing to do yet
-}
-
 void Obfs3Client::on_outgoing_data_connecting() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
@@ -188,10 +184,6 @@ void Obfs3Client::on_outgoing_data() {
     return;
   }
   ::evbuffer_drain(buf, len);
-}
-
-void Obfs3Client::on_outgoing_drained() {
-  // Nothing to do yet
 }
 
 bool Obfs3Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {

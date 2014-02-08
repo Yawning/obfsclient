@@ -139,10 +139,6 @@ out_error:
   ::evbuffer_drain(buf, len);
 }
 
-void Obfs2Client::on_incoming_drained() {
-  // Nothing to do yet
-}
-
 void Obfs2Client::on_outgoing_data_connecting() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
@@ -233,10 +229,6 @@ out_error:
   if (::bufferevent_write(incoming_, p, len) != 0)
     goto out_error;
   ::evbuffer_drain(buf, len);
-}
-
-void Obfs2Client::on_outgoing_drained() {
-  // Nothing to do yet
 }
 
 bool Obfs2Client::mac(const uint8_t* key,

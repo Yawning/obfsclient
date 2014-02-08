@@ -131,7 +131,9 @@ class Socks5Server {
     virtual bool on_client_authenticate(const uint8_t* uname,
                                         const uint8_t ulen,
                                         const uint8_t* passwd,
-                                        const uint8_t plen) = 0;
+                                        const uint8_t plen) {
+      return false;
+    }
 
     /** Remote peer connection established callback */
     virtual void on_outgoing_connected() = 0;
@@ -140,7 +142,7 @@ class Socks5Server {
     virtual void on_incoming_data() = 0;
 
     /** SOCKS Server to Client write queue empty callback */
-    virtual void on_incoming_drained() = 0;
+    virtual void on_incoming_drained() {}
 
     /** Client to SOCKS Server data received callback (State::kCONNECTING) */
     virtual void on_outgoing_data_connecting() = 0;
@@ -149,7 +151,7 @@ class Socks5Server {
     virtual void on_outgoing_data() = 0;
 
     /** SOCKS Server to Remote peer write queue empty callback */
-    virtual void on_outgoing_drained() = 0;
+    virtual void on_outgoing_drained() {}
     /** @} */
 
     /**
