@@ -63,6 +63,45 @@ static bool init_libevent() {
   return ev_base != nullptr;
 }
 
+template<class Factory>
+static bool init_pt(const allium_ptcfg* cfg,
+                    const char* name,
+                    ::std::list<::std::unique_ptr<Socks5Factory>>& factories,
+                    ::std::list<::std::unique_ptr<Socks5Server>>& listeners) {
+  if (::allium_ptcfg_method_requested(cfg, kObfs3MethodName) != 1)
+    return false;
+
+  if (!init_libevent()) {
+    ::allium_ptcfg_method_error(cfg, name, "event_base_new()");
+    return false;
+  }
+
+  Factory* factory = new Factory;
+  Socks5Server* listener = new Socks5Server(factory, ev_base);
+  if (!listener->bind()) {
+    ::allium_ptcfg_method_error(cfg, name, "Socks5::bind()");
+out_free:
+    delete factory;
+    delete listener;
+    return false;
+  }
+
+  struct sockaddr_in socks_addr;
+  if (!listener->addr(socks_addr)) {
+    ::allium_ptcfg_method_error(cfg, name, "Socks5::addr()");
+    goto out_free;
+  }
+
+  factories.push_back(::std::unique_ptr<Socks5Factory>(factory));
+  listeners.push_back(::std::unique_ptr<Socks5Server>(listener));
+
+  ::allium_ptcfg_cmethod_report(cfg, name, 5,
+                                reinterpret_cast<struct sockaddr*>(&socks_addr),
+                                sizeof(socks_addr), nullptr, nullptr);
+
+  return true;
+}
+
 int main(int argc, char* argv[]) {
   ::std::list<::std::unique_ptr<Socks5Factory>> factories;
   ::std::list<::std::unique_ptr<Socks5Server>> listeners;
@@ -73,84 +112,24 @@ int main(int argc, char* argv[]) {
     return -1;
 
   if (::allium_ptcfg_is_server(cfg)) {
-out_error:
     ::allium_ptcfg_methods_done(cfg);
     ::allium_ptcfg_free(cfg);
     return -1;
   }
 
-  // Attempt to configure obfs3
-  int rval = ::allium_ptcfg_method_requested(cfg, kObfs3MethodName);
-  if (rval == 1) {
-    if (!init_libevent()) {
-      ::allium_ptcfg_method_error(cfg, kObfs3MethodName, "event_base_new()");
-      goto out_error;
-    }
-
-    Obfs3Factory* factory = new Obfs3Factory;
-    Socks5Server* listener = new Socks5Server(factory, ev_base);
-    if (!listener->bind()) {
-      ::allium_ptcfg_method_error(cfg, kObfs3MethodName, "Socks5::bind()");
-out_free_obfs3:
-      delete factory;
-      delete listener;
-      goto try_obfs2;
-    }
-
-    struct sockaddr_in socks_addr;
-    if (!listener->addr(socks_addr)) {
-      ::allium_ptcfg_method_error(cfg, kObfs3MethodName, "Socks5::addr()");
-      goto out_free_obfs3;
-    }
-
-    factories.push_back(::std::unique_ptr<Socks5Factory>(factory));
-    listeners.push_back(::std::unique_ptr<Socks5Server>(listener));
-
-    ::allium_ptcfg_cmethod_report(cfg, kObfs3MethodName, 5,
-                                  reinterpret_cast<struct sockaddr*>(&socks_addr),
-                                  sizeof(socks_addr), nullptr, nullptr);
-  }
-
-  // Attempt to configure obfs2
-try_obfs2:
-  rval = ::allium_ptcfg_method_requested(cfg, kObfs2MethodName);
-  if (rval == 1) {
-    if (!init_libevent()) {
-      ::allium_ptcfg_method_error(cfg, kObfs2MethodName, "event_base_new()");
-      goto out_error;
-    }
-
-    Obfs2Factory* factory = new Obfs2Factory;
-    Socks5Server* listener = new Socks5Server(factory, ev_base);
-    if (!listener->bind()) {
-      ::allium_ptcfg_method_error(cfg, kObfs2MethodName, "Socks5::bind()");
-out_free_obfs2:
-      delete factory;
-      delete listener;
-      goto done;
-    }
-
-    struct sockaddr_in socks_addr;
-    if (!listener->addr(socks_addr)) {
-      ::allium_ptcfg_method_error(cfg, kObfs2MethodName, "Socks5::addr()");
-      goto out_free_obfs2;
-    }
-
-    factories.push_back(::std::unique_ptr<Socks5Factory>(factory));
-    listeners.push_back(::std::unique_ptr<Socks5Server>(listener));
-
-    ::allium_ptcfg_cmethod_report(cfg, kObfs2MethodName, 5,
-                                  reinterpret_cast<struct sockaddr*>(&socks_addr),
-                                  sizeof(socks_addr), nullptr, nullptr);
-  }
+  // Attempt to initialize the supported PTs
+  bool dispatch_loop = false;
+  dispatch_loop |= init_pt<Obfs3Factory>(cfg, kObfs3MethodName, factories,
+                                         listeners);
+  dispatch_loop |= init_pt<Obfs2Factory>(cfg, kObfs2MethodName, factories,
+                                         listeners);
 
   // Done with the config!
-done:
   ::allium_ptcfg_methods_done(cfg);
   ::allium_ptcfg_free(cfg);
 
   SL_ASSERT(factories.size() == listeners.size());
-  if (listeners.size() > 0) {
+  if (dispatch_loop) {
     // TODO: Install a SIGINT handler (Tor just kills us anyway)
 
     // Mask off SIGPIPE
