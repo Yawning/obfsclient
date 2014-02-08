@@ -120,7 +120,7 @@ Socks5Server::Session::Session(struct event_base* base,
     remote_addr_(),
     remote_addr_len_(0),
     state_(State::kREAD_METHODS),
-    auth_required_(false),
+    auth_required_(require_auth),
     auth_method_(AuthMethod::kNO_ACCEPTABLE),
     incoming_valid_(false),
     outgoing_valid_(false) {
@@ -352,7 +352,7 @@ void Socks5Server::Session::incoming_read_auth_cb() {
   if (p == nullptr) {
 out_fail:
     // Send a failure response
-    const uint8_t resp[2] = { 0x01, 0x00 };
+    const uint8_t resp[2] = { 0x01, 0xff };
     int ret = ::bufferevent_write(incoming_, resp, sizeof(resp));
     if (ret != 0) {
       delete this;
