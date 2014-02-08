@@ -65,7 +65,6 @@ Caveats:
    secrecy.
  * The UniformDH implementation is glacially slow.  I may be spoiled by using
    Curve25519 so much lately.
- * IPv6 is unsupported, even though it could be if I used SOCKSv5.
  * There is no pushback between the incoming/outgoing sockets, so congestion
    feedback from the bottleneck link will not get propagated.  While this is
    trivial to fix, the official client does not appear to do this either.
@@ -74,7 +73,7 @@ Caveats:
 
  * Logging would be nice (Maybe?  It Just Works (TM)).
  * A connection timeout.
- * Assuming people actually want to use this, add support for scramblesuite.
+ * Assuming people actually want to use this, add support for ScrambleSuite.
  * The build system sucks.
 
 ### WON'T DO
