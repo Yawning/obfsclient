@@ -35,7 +35,7 @@
 #define SCHWANENLIED_PT_OBFS2CLIENT_H__
 
 #include "schwanenlied/common.h"
-#include "schwanenlied/socks4_server.h"
+#include "schwanenlied/socks5_server.h"
 #include "schwanenlied/crypto/aes_ctr128.h"
 #include "schwanenlied/crypto/sha256.h"
 
@@ -45,16 +45,16 @@ namespace pt {
 /**
  * obfs2 (The Twobfuscator) Client
  *
- * This implements a wire compatibile obfs2 client using Socks4Server.
+ * This implements a wire compatibile obfs2 client using Socks5Server.
  *
  * @todo Investigate using evbuffer_peek()/evbuffer_add_buffer() for better
  * performance (current code is more obviously correct).
  */
-class Obfs2Client : public Socks4Server::Session {
+class Obfs2Client : public Socks5Server::Session {
  public:
   /** Obfs2Client factory */
-  class SessionFactory : public Socks4Server::SessionFactory {
-    Socks4Server::Session* create_session(struct event_base* base,
+  class SessionFactory : public Socks5Server::SessionFactory {
+    Socks5Server::Session* create_session(struct event_base* base,
                                           const evutil_socket_t sock,
                                           const struct sockaddr *addr,
                                           const int addr_len) override {
@@ -75,6 +75,13 @@ class Obfs2Client : public Socks4Server::Session {
   ~Obfs2Client() = default;
 
  protected:
+  bool on_client_authenticate(const uint8_t* uname,
+                              const uint8_t ulen,
+                              const uint8_t* passwd,
+                              const uint8_t plen) override {
+    return true;
+  }
+
   void on_outgoing_connected() override;
 
   void on_incoming_data() override;

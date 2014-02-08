@@ -48,7 +48,7 @@ void Obfs3Client::on_outgoing_connected() {
                                 public_key.size());
   if (ret != 0) {
 out_error:
-    send_socks4_response(false);
+    send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
 
@@ -128,7 +128,7 @@ void Obfs3Client::on_outgoing_data_connecting() {
   uint8_t *p = ::evbuffer_pullup(buf, crypto::UniformDH::kKeySz);
   if (p == nullptr) {
 out_error:
-    send_socks4_response(false);
+    send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
   if (!uniform_dh_.compute_key(p, crypto::UniformDH::kKeySz))
@@ -141,7 +141,7 @@ out_error:
   ::evbuffer_drain(buf, crypto::UniformDH::kKeySz);
 
   // Handshaked
-  send_socks4_response(true);
+  send_socks5_response(Reply::kSUCCEDED);
 }
 
 void Obfs3Client::on_outgoing_data() {

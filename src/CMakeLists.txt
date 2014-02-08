@@ -8,7 +8,7 @@ set(obfsclient_SRCS
   schwanenlied/crypto/utils.cc
   schwanenlied/pt/obfs2client.cc
   schwanenlied/pt/obfs3client.cc
-  schwanenlied/socks4_server.cc
+  schwanenlied/socks5_server.cc
 )
 
 # Unit tests

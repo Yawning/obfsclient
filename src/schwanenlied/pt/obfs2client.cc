@@ -54,7 +54,7 @@ void Obfs2Client::on_outgoing_connected() {
   int ret = ::RAND_bytes(&init_seed_[0], init_seed_.size());
   if (ret != 1) {
 out_error:
-    send_socks4_response(false);
+    send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
 
@@ -163,7 +163,7 @@ void Obfs2Client::on_outgoing_data_connecting() {
     uint8_t* p = ::evbuffer_pullup(buf, seed_hdr_sz);
     if (p == nullptr) {
 out_error:
-      send_socks4_response(false);
+      send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
 
@@ -209,7 +209,7 @@ out_error:
   }
 
   // Handshaked
-  send_socks4_response(true);
+  send_socks5_response(Reply::kSUCCEDED);
 }
 
 void Obfs2Client::on_outgoing_data() {

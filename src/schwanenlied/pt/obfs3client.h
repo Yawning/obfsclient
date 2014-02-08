@@ -35,7 +35,7 @@
 #define SCHWANENLIED_PT_OBFS3CLIENT_H__
 
 #include "schwanenlied/common.h"
-#include "schwanenlied/socks4_server.h"
+#include "schwanenlied/socks5_server.h"
 #include "schwanenlied/crypto/aes_ctr128.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
 #include "schwanenlied/crypto/uniform_dh.h"
@@ -46,17 +46,17 @@ namespace pt {
 /**
  * obfs3 (The Threebfuscator) Client
  *
- * This implements a wire compatible obfs3 client using Socks4Server.
+ * This implements a wire compatible obfs3 client using Socks5Server.
  *
  * @todo Investigate using evbuffer_peek()/evbuffer_add_buffer() for better
  * performance (current code is more obviously correct).
  */
-class Obfs3Client : public Socks4Server::Session {
+class Obfs3Client : public Socks5Server::Session {
  public:
   /** Obfs3Client factory */
-  class SessionFactory : public Socks4Server::SessionFactory {
+  class SessionFactory : public Socks5Server::SessionFactory {
    public:
-    Socks4Server::Session* create_session(struct event_base* base,
+    Socks5Server::Session* create_session(struct event_base* base,
                                           const evutil_socket_t sock,
                                           const struct sockaddr* addr,
                                           const int addr_len) override {
@@ -68,7 +68,7 @@ class Obfs3Client : public Socks4Server::Session {
               const evutil_socket_t sock,
               const struct sockaddr* addr,
               const int addr_len) :
-      Session(base, sock, addr, addr_len),
+      Session(base, sock, addr, addr_len, false),
       sent_magic_(false),
       received_magic_(false),
       initiator_magic_(crypto::HmacSha256::kDigestLength, 0),
@@ -77,6 +77,13 @@ class Obfs3Client : public Socks4Server::Session {
   ~Obfs3Client() = default;
 
  protected:
+  bool on_client_authenticate(const uint8_t* uname,
+                              const uint8_t ulen,
+                              const uint8_t* passwd,
+                              const uint8_t plen) override {
+    return true;
+  }
+
   void on_outgoing_connected() override;
 
   void on_incoming_data() override;

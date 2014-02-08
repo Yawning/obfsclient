@@ -1,7 +1,7 @@
 /**
- * @file    socks4_server.h
+ * @file    socks5_server.h
  * @author  Yawning Angel (yawning at schwanenlied dot me)
- * @brief   SOCKSv4 Server
+ * @brief   SOCKSv5 Server
  */
 
 /*
@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SCHWANENLIED_SOCKS4_SERVER_H__
-#define SCHWANENLIED_SOCKS4_SERVER_H__
+#ifndef SCHWANENLIED_SOCKS5_SERVER_H__
+#define SCHWANENLIED_SOCKS5_SERVER_H__
 
 #include <list>
 #include <memory>
@@ -45,60 +45,94 @@
 namespace schwanenlied {
 
 /**
- * A simple libevent2 based SOCKSv4 server
+ * A simple libevent2 based SOCKSv5 server
  *
  * This is used by subclassing Session and SessionFactory with the desired
  * behavior.  In general SessionFactory should be a simple adapter to create a
  * new Session instance.  Some familiarity with libevent2 is assumed.
  *
- * Socks4Server will handle:
- *  * The SOCKSv4 protocol
+ * Socks5Server will handle:
+ *  * The SOCKSv5 protocol
  *  * Opening a TCP/IP connection to the remote peer
  *  * Attempting to flush queued data when either of the connections is closed
  *
  * Current limitations:
  *  * It will *ALWAYS* bind to 127.0.0.1:RandomPort
- *  * Only requests of type 0x01 (establish TCP/IP stream) is supported
- *  * USERID must be empty (Expects 1 byte set to NULL)
+ *  * Only CONNECT (establish TCP/IP stream) is supported
+ *  * Only ATYP 0x01/0x03 are supported (no FQDN)
+ *  * GSSAPI auth will never be supported
  *
- * @warning Destroying the Socks4Server instance (or calling
- * Socks4Server::close()) **WILL NOT** terminate existing sessions.
+ * @warning Destroying the Socks5Server instance (or calling
+ * Socks5Server::close()) **WILL NOT** terminate existing sessions.
  */
-class Socks4Server {
+class Socks5Server {
  public:
   /**
-   * The SOCKSv4 session
+   * The SOCKSv5 session
    *
    * All servers *MUST* implement this class to provide desired behavior.  In
    * the simple case (where transforming data is not required), it is sufficient
-   * to call send_socks4_response() from the on_outgoing_connected() callback,
+   * to call send_socks5_response() from the on_outgoing_connected() callback,
    * and shuffle data between incoming_ and outgoing_ in
    * incoming_read_cb()/outgoing_read_cb().  When it is neccecary to terminate a
    * session, deleting the instance will do the right thing.
-   *
-   * @warning Messing with the bufferevent watermarks will cause bad things to
-   * happen, so don't.
    */
   class Session {
    public:
     /**
      * Construct a Session instance
      *
-     * @param[in] base      The libevent2 event_base associated with the
-     *                      Socks4Server
-     * @param[in] sock      The Client to SOCKS server socket
-     * @param[in] addr      The address of the client
-     * @param[in] addr_len  The length of the sockaddr pointed to by addr
+     * @param[in] base          The libevent2 event_base associated with the
+     *                          Socks5Server
+     * @param[in] sock          The Client to SOCKS server socket
+     * @param[in] addr          The address of the client
+     * @param[in] addr_len      The length of the sockaddr pointed to by addr
+     * @param[in] requre_auth   Authentication is required?
      */
     Session(struct event_base* base,
             const evutil_socket_t sock,
             const struct sockaddr* addr,
-            const int addr_len);
+            const int addr_len,
+            const bool require_auth = false);
 
     virtual ~Session();
 
    protected:
+    /** The SOCKSv5 reply codes */
+    enum Reply {
+      kSUCCEDED = 0x00,             /**< Succeded */
+      kGENERAL_FAILURE = 0x01,      /**< General SOCKS server failure */
+      kNOT_ALLOWED = 0x02,          /**< Connection not allowed */
+      kNETWORK_UNREACHABLE = 0x03,  /**< Network unreachable */
+      kHOST_UNREACHABLE = 0x04,     /**< Host unreachable */
+      kCONNECTION_REFUSED = 0x05,   /**< Connection refused */
+      kTTL_EXPIRED = 0x06,          /**< TTL expired */
+      kCOMMAND_NOT_SUPP = 0x07,     /**< Command not supported */
+      kADDR_NOT_SUPP = 0x08         /**< Address type not supported */
+    };
+
     /** @{ */
+    /**
+     * Client authentication callback
+     *
+     * Called when the client authenticates with the SOCKS server, but before
+     * the connect request comes in.  It is important to note that neither uname
+     * nor passwd are NULL terminated, and returning false from this routine
+     * will terminate the session.
+     *
+     * @param[in] uname   Username
+     * @param[in] ulen    The length of uname
+     * @param[in] passwd  Password
+     * @param[in] plen    The length of password
+     *
+     * @returns true  - Success
+     * @returns false - Failure (Close connection)
+     */
+    virtual bool on_client_authenticate(const uint8_t* uname,
+                                        const uint8_t ulen,
+                                        const uint8_t* passwd,
+                                        const uint8_t plen) = 0;
+
     /** Remote peer connection established callback */
     virtual void on_outgoing_connected() = 0;
 
@@ -119,7 +153,7 @@ class Socks4Server {
     /** @} */
 
     /**
-     * Send a SOCKSv4 response to the client
+     * Send a SOCKSv5 response to the client
      *
      * This should be called when the remote connection is established and the
      * session is ready to start relaying data.
@@ -127,9 +161,13 @@ class Socks4Server {
      * @note Sending a failure message will cause the current session to be
      * destroyed after the response is sent.
      *
-     * @param[in] success Connection to remote peer successfully established?
+     * @warning On certain libevent failures, this routine will destroy the
+     * session, so after invoking this, it is UNSAFE to touch the session for
+     * the remainer of the callback.
+     *
+     * @param[in] reply The reply code to be sent
      */
-    void send_socks4_response(const bool success);
+    void send_socks5_response(const Reply reply);
 
     /** The libevent2 event_base */
     struct event_base* base_;
@@ -138,28 +176,68 @@ class Socks4Server {
     /** The SOCKS Server to Remote peer bufferevent */
     struct bufferevent* outgoing_;
     /** The remote peer's address */
-    struct sockaddr_in remote_addr_;
+    struct sockaddr_storage remote_addr_;
+    /** The length of remote_addr_ */
+    socklen_t remote_addr_len_;
 
-    /** The SOCKSv4 session state */
+    /** The SOCKSv5 session state */
     enum class State {
       kINVALID,
-      kREAD_REQUEST,      /**< Reading Request */
+      kREAD_METHODS,      /**< Reading auth methods */
+      kAUTHENTICATING,    /**< Authenticating (Optional) */
+      kREAD_REQUEST,      /**< Reading request */
       kCONNECTING,        /**< Connecting to remote destination */
       kESTABLISHED,       /**< Established, proxying data */
       kFLUSHING_INCOMING, /**< outgoing_ closed, flushing incoming_ */
       kFLUSHING_OUTGOING, /**< incoming_ closed, flushing outgoing_ */
-    } state_; /**< The SOCKSv4 session state */
+    } state_; /**< The SOCKSv5 session state */
 
    private:
     Session(const Session&) = delete;
     void operator=(const Session&) = delete;
 
+    static const uint8_t kSocksVersion = 0x05;
+
+    /** The SOCKSv5 authentication methods */
+    enum AuthMethod {
+      kNONE_REQUIRED = 0x00,      /**< NO AUTHENTICATION RQUIRED */
+      kGSSAPI = 0x01,             /**< GSSAPI (Unsupported) */
+      kUSERNAME_PASSWORD = 0x02,  /**< USERNAME/PASSWORD (RFC1929) */
+      kTOR_EXTENDED = 0x80,       /**< Tor Pluggable Transport (EXPERIMENTAL) */
+      kNO_ACCEPTABLE = 0xff       /**< NO ACCEPTABLE METHODS */
+    };
+
+    /** The SOCKSv5 command types */
+    enum Command {
+      kCONNECT = 0x01,      /**< TCP/IP Connect */
+      kBIND = 0x02,         /**< TCP/IP Bind (Unsupported) */
+      kUDP_ASSOCIATE = 0x03 /**< UDP bind (Unsupported) */
+    };
+
+    /** The SOCKSv5 address types */
+    enum AddressType {
+      kIPv4 = 0x01,       /**< IPv4 */
+      kDOMAINNAME = 0x02, /**< FQDN (Unsupported) */
+      kIPv6 = 0x04        /**< IPv6 */
+    };
+
+    bool auth_required_;  /**< Client must authenticate? */
+    AuthMethod auth_method_; /**< Negotiated auth method */
     bool incoming_valid_; /**< incoming_ connected? */
     bool outgoing_valid_; /**< outgoing_ connected? */
 
     /** @{ */
     /** The Client to SOCKS server libevent2 bufferevent read callback */
     void incoming_read_cb();
+
+    /** The State::kREAD_METHODS read callback */
+    void incoming_read_methods_cb();
+
+    /** The State::kAUTHENTICATING read callback */
+    void incoming_read_auth_cb();
+
+    /** The State::kREAD_REQUEST read callback */
+    void incoming_read_request_cb();
 
     /** The SOCKS server to Client libevent2 bufferevent write callback */
     void incoming_write_cb();
@@ -202,7 +280,7 @@ class Socks4Server {
      * Create a new Session instance
      *
      * @param[in] base      The libevent2 event_base associated with the
-     *                      Socks4Server
+     *                      Socks5Server
      * @param[in] sock      The Client to SOCKS server socket
      * @param[in] addr      The address of the client
      * @param[in] addr_len  The length of the sockaddr pointed to by addr
@@ -217,29 +295,29 @@ class Socks4Server {
   };
 
   /**
-   * Construct a Socks4Server
+   * Construct a Socks5Server
    *
    * @param[in] factory   The SessionFactory to use when creating Session
    *                      instances for client connections
    * @param[in] base      The libevent2 event_base to use
    */
-  Socks4Server(SessionFactory* factory,
+  Socks5Server(SessionFactory* factory,
                struct event_base* base) :
       factory_(factory),
       base_(base),
       listener_(nullptr),
       listener_addr_() {}
 
-  ~Socks4Server();
+  ~Socks5Server();
 
   /** @{ */
   /**
-   * Query the local address that the Socks4Server is listening on
+   * Query the local address that the Socks5Server is listening on
    *
    * @param[out]  addr  The address to fill with the local address
    *
-   * @returns true  - The Socks4Server is listening
-   * @returns false - The Socks4Server is not listening (Call bind())
+   * @returns true  - The Socks5Server is listening
+   * @returns false - The Socks5Server is not listening (Call bind())
    */
   const bool addr(struct sockaddr_in& addr) const;
   /** @} */
@@ -262,8 +340,8 @@ class Socks4Server {
   /** @} */
 
  private:
-  Socks4Server(const Socks4Server&) = delete;
-  void operator=(const Socks4Server&) = delete;
+  Socks5Server(const Socks5Server&) = delete;
+  void operator=(const Socks5Server&) = delete;
 
   /** The SOCKS server libevent2 evconnlistener callback */
   void on_new_connection(evutil_socket_t sock,
@@ -278,4 +356,4 @@ class Socks4Server {
 
 } // namespace schwanenlied
 
-#endif // SCHWANENLIED_SOCKS4_SERVER_H__
+#endif // SCHWANENLIED_SOCKS5_SERVER_H__

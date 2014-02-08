@@ -43,12 +43,12 @@
 #include <event2/event.h>
 
 #include "schwanenlied/common.h"
-#include "schwanenlied/socks4_server.h"
+#include "schwanenlied/socks5_server.h"
 #include "schwanenlied/pt/obfs2client.h"
 #include "schwanenlied/pt/obfs3client.h"
 
-using Socks4Server = schwanenlied::Socks4Server;
-using Socks4Factory = schwanenlied::Socks4Server::SessionFactory;
+using Socks5Server = schwanenlied::Socks5Server;
+using Socks5Factory = schwanenlied::Socks5Server::SessionFactory;
 using Obfs2Factory = schwanenlied::pt::Obfs2Client::SessionFactory;
 using Obfs3Factory = schwanenlied::pt::Obfs3Client::SessionFactory;
 
@@ -64,8 +64,8 @@ static bool init_libevent() {
 }
 
 int main(int argc, char* argv[]) {
-  ::std::list<::std::unique_ptr<Socks4Factory>> factories;
-  ::std::list<::std::unique_ptr<Socks4Server>> listeners;
+  ::std::list<::std::unique_ptr<Socks5Factory>> factories;
+  ::std::list<::std::unique_ptr<Socks5Server>> listeners;
   allium_ptcfg* cfg;
 
   cfg = ::allium_ptcfg_init();
@@ -88,9 +88,9 @@ out_error:
     }
 
     Obfs3Factory* factory = new Obfs3Factory;
-    Socks4Server* listener = new Socks4Server(factory, ev_base);
+    Socks5Server* listener = new Socks5Server(factory, ev_base);
     if (!listener->bind()) {
-      ::allium_ptcfg_method_error(cfg, kObfs3MethodName, "Socks4::bind()");
+      ::allium_ptcfg_method_error(cfg, kObfs3MethodName, "Socks5::bind()");
 out_free_obfs3:
       delete factory;
       delete listener;
@@ -99,14 +99,14 @@ out_free_obfs3:
 
     struct sockaddr_in socks_addr;
     if (!listener->addr(socks_addr)) {
-      ::allium_ptcfg_method_error(cfg, kObfs3MethodName, "Socks4::addr()");
+      ::allium_ptcfg_method_error(cfg, kObfs3MethodName, "Socks5::addr()");
       goto out_free_obfs3;
     }
 
-    factories.push_back(::std::unique_ptr<Socks4Factory>(factory));
-    listeners.push_back(::std::unique_ptr<Socks4Server>(listener));
+    factories.push_back(::std::unique_ptr<Socks5Factory>(factory));
+    listeners.push_back(::std::unique_ptr<Socks5Server>(listener));
 
-    ::allium_ptcfg_cmethod_report(cfg, kObfs3MethodName, 4,
+    ::allium_ptcfg_cmethod_report(cfg, kObfs3MethodName, 5,
                                   reinterpret_cast<struct sockaddr*>(&socks_addr),
                                   sizeof(socks_addr), NULL, NULL);
   }
@@ -121,9 +121,9 @@ try_obfs2:
     }
 
     Obfs2Factory* factory = new Obfs2Factory;
-    Socks4Server* listener = new Socks4Server(factory, ev_base);
+    Socks5Server* listener = new Socks5Server(factory, ev_base);
     if (!listener->bind()) {
-      ::allium_ptcfg_method_error(cfg, kObfs2MethodName, "Socks4::bind()");
+      ::allium_ptcfg_method_error(cfg, kObfs2MethodName, "Socks5::bind()");
 out_free_obfs2:
       delete factory;
       delete listener;
@@ -132,14 +132,14 @@ out_free_obfs2:
 
     struct sockaddr_in socks_addr;
     if (!listener->addr(socks_addr)) {
-      ::allium_ptcfg_method_error(cfg, kObfs2MethodName, "Socks4::addr()");
+      ::allium_ptcfg_method_error(cfg, kObfs2MethodName, "Socks5::addr()");
       goto out_free_obfs2;
     }
 
-    factories.push_back(::std::unique_ptr<Socks4Factory>(factory));
-    listeners.push_back(::std::unique_ptr<Socks4Server>(listener));
+    factories.push_back(::std::unique_ptr<Socks5Factory>(factory));
+    listeners.push_back(::std::unique_ptr<Socks5Server>(listener));
 
-    ::allium_ptcfg_cmethod_report(cfg, kObfs2MethodName, 4,
+    ::allium_ptcfg_cmethod_report(cfg, kObfs2MethodName, 5,
                                   reinterpret_cast<struct sockaddr*>(&socks_addr),
                                   sizeof(socks_addr), NULL, NULL);
   }
