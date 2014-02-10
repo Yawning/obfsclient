@@ -34,6 +34,8 @@
 #ifndef SCHWANENLIED_CRYPTO_HMAC_SHA256_H__
 #define SCHWANENLIED_CRYPTO_HMAC_SHA256_H__
 
+#include <openssl/hmac.h>
+
 #include "schwanenlied/common.h"
 #include "schwanenlied/crypto/utils.h"
 
@@ -51,13 +53,78 @@ class HmacSha256 {
   /**
    * Construct a HmacSha256 instance
    *
+   * set_key() must be called before digests can be obtained.
+   */
+  HmacSha256() :
+      has_key_(false) {
+    ::HMAC_CTX_init(&ctx_);
+  }
+
+  /**
+   * Construct a HmacSha256 instance
+   *
    * @param[in] key   The key to use when calculating digests
    */
   HmacSha256(const SecureBuffer& key) :
-      key_(key) {}
+      has_key_(true),
+      key_(key) {
+    ::HMAC_CTX_init(&ctx_);
+  }
 
-  ~HmacSha256() = default;
+  ~HmacSha256() {
+    ::HMAC_CTX_cleanup(&ctx_);
+  }
 
+  /** @{ */
+  /**
+   * Set the key
+   *
+   * @warning This will invalidate digest calculations in progress via the
+   * streaming interface
+   *
+   * @param[in] key   The key to use when calculating digests
+   *
+   * @returns true  - Success
+   * @returns false - Failure
+   */
+  bool set_key(const SecureBuffer& key);
+  /** @} */
+
+  /** @{ */
+  /**
+   * Initialize the streaming interface
+   *
+   * @returns true  - Success
+   * @returns false - Failure
+   */
+  bool init();
+
+  /**
+   * HMAC additional data via the streaming interface
+   *
+   * @param[in] buf   A pointer to the buffer to be HMACed
+   * @param[in] len   The size of the buffer to HMAC
+   *
+   * @returns true  - Success
+   * @returns false - Failure
+   */
+  bool update(const uint8_t* buf,
+              const size_t len);
+
+  /**
+   * Obtain the digest from the streaming interface
+   *
+   * @param[out] out    A pointer to where the digest should be stored
+   * @param[in] out_len The length of the buffer where the digest will be stored
+   *
+   * @returns true  - Success
+   * @returns false - Failure
+   */
+  bool final(uint8_t* out,
+             const size_t out_len);
+  /** @} */
+
+  /** @{ */
   /**
    * One shot digest calculation
    *
@@ -74,13 +141,22 @@ class HmacSha256 {
               const size_t len,
               uint8_t* out,
               const size_t out_len) const;
+  /** @} */
 
  private:
-  HmacSha256() = delete;
   HmacSha256(const HmacSha256&) = delete;
   void operator=(const HmacSha256&) = delete;
 
+  /** The streaming interface state */
+  enum class State {
+    kINVALID, /**< init() has not been called */
+    kINIT,    /**< init() has been called */
+    kUPDATE,  /**< update() has been called */
+  } stream_state_;    /**< The streaming interface state */
+
+  bool has_key_;      /**< The key is valid? */
   SecureBuffer key_;  /**< The key used when calculating digests */
+  HMAC_CTX ctx_;
 };
 
 } // namespace crypto

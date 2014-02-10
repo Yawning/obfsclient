@@ -33,21 +33,87 @@
 
 #include <cstring>
 
-#include <openssl/hmac.h>
-
 #include "schwanenlied/crypto/hmac_sha256.h"
 
 namespace schwanenlied {
 namespace crypto {
 
+bool HmacSha256::set_key(const SecureBuffer& key) {
+  key_.assign(key);
+  has_key_ = true;
+  ::HMAC_CTX_cleanup(&ctx_);
+  stream_state_ = State::kINVALID;
+
+  return true;
+}
+
+bool HmacSha256::init() {
+  stream_state_ = State::kINVALID;
+
+  if (1 != ::HMAC_Init_ex(&ctx_, key_.data(), key_.size(), ::EVP_sha256(),
+                          nullptr))
+    return false;
+
+  stream_state_ = State::kINIT;
+
+  return true;
+}
+
+bool HmacSha256::update(const uint8_t* buf,
+                        const size_t len) {
+  if (!has_key_)
+    return false;
+  if (buf == nullptr)
+    return false;
+  if (len == 0)
+    return false;
+  if (stream_state_ != State::kINIT || stream_state_ != State::kUPDATE)
+    return false;
+
+  if (1 != ::HMAC_Update(&ctx_, buf, len))
+    return false;
+
+  return true;
+}
+
+bool HmacSha256::final(uint8_t* out,
+                       const size_t out_len) {
+  if (!has_key_)
+    return false;
+  if (out == nullptr)
+    return false;
+  if (out_len == 0)
+    return false;
+  if (stream_state_ != State::kINIT || stream_state_ != State::kUPDATE)
+    return false;
+  if (out_len > kDigestLength)
+    return false;
+  else if (out_len == kDigestLength) {
+    unsigned int digest_len = out_len;
+    if (1 != ::HMAC_Final(&ctx_, out, &digest_len))
+      return false;
+    return (digest_len == out_len);
+  } else {
+    uint8_t digest[kDigestLength] = { 0 };
+    unsigned int digest_len = kDigestLength;
+    if (1 != ::HMAC_Final(&ctx_, digest, &digest_len))
+      return false;
+    ::std::memcpy(out, digest, out_len);
+    return (digest_len == kDigestLength);
+  }
+}
+
 bool HmacSha256::digest(const uint8_t* buf,
                         const size_t len,
                         uint8_t* out,
                         const size_t out_len) const {
+  if (!has_key_)
+    return false;
   if (buf == nullptr && len != 0)
     return false;
   if (out == nullptr)
     return false;
+
   if (out_len > kDigestLength)
     return false;
   else if (out_len == kDigestLength) {
