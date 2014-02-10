@@ -488,6 +488,48 @@ void Socks5Server::Session::incoming_event_cb(const short events) {
   }
 }
 
+void Socks5Server::Session::outgoing_connect_cb(const short events) {
+  SL_ASSERT(state_ == State::kCONNECTING);
+
+  if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
+    switch (EVUTIL_SOCKET_ERROR()) {
+    case ENETUNREACH:
+      send_socks5_response(Reply::kNETWORK_UNREACHABLE);
+      break;
+    case EHOSTUNREACH:
+      send_socks5_response(Reply::kHOST_UNREACHABLE);
+      break;
+    case ECONNREFUSED:
+      send_socks5_response(Reply::kCONNECTION_REFUSED);
+      break;
+    default:
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+    }
+
+    // Flush the reply
+    outgoing_event_cb(events);
+  } else if (events & BEV_EVENT_CONNECTED) {
+    bufferevent_data_cb readcb = [](struct bufferevent *bev,
+                                    void *ctx) {
+      reinterpret_cast<Session*>(ctx)->outgoing_read_cb();
+    };
+    bufferevent_data_cb writecb = [](struct bufferevent *bev,
+                                     void *ctx) {
+      reinterpret_cast<Session*>(ctx)->outgoing_write_cb();
+    };
+    bufferevent_event_cb eventcb = [](struct bufferevent *bev,
+                                      short events,
+                                      void *ctx) {
+      reinterpret_cast<Session*>(ctx)->outgoing_event_cb(events);
+    };
+    ::bufferevent_enable(outgoing_, EV_READ | EV_WRITE);
+    ::bufferevent_setcb(outgoing_, readcb, writecb, eventcb, this);
+
+    outgoing_valid_ = true;
+    on_outgoing_connected();
+  }
+}
+
 void Socks5Server::Session::outgoing_read_cb() {
   if (!outgoing_valid_)
     return;
@@ -515,10 +557,7 @@ void Socks5Server::Session::outgoing_write_cb() {
 }
 
 void Socks5Server::Session::outgoing_event_cb(const short events) {
-  if (events & BEV_EVENT_CONNECTED) {
-    outgoing_valid_ = true;
-    on_outgoing_connected();
-  } else if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
+  if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
     const struct evbuffer* buf = ::bufferevent_get_output(incoming_);
     outgoing_valid_ = false;
     if (!incoming_valid_ || ::evbuffer_get_length(buf) == 0) {
@@ -544,21 +583,12 @@ bool Socks5Server::Session::outgoing_connect() {
   if (outgoing_ == nullptr)
     return false;
 
-  bufferevent_data_cb readcb = [](struct bufferevent *bev,
-                                  void *ctx) {
-    reinterpret_cast<Session*>(ctx)->outgoing_read_cb();
-  };
-  bufferevent_data_cb writecb = [](struct bufferevent *bev,
-                                   void *ctx) {
-    reinterpret_cast<Session*>(ctx)->outgoing_write_cb();
-  };
   bufferevent_event_cb eventcb = [](struct bufferevent *bev,
                                     short events,
                                     void *ctx) {
-    reinterpret_cast<Session*>(ctx)->outgoing_event_cb(events);
+    reinterpret_cast<Session*>(ctx)->outgoing_connect_cb(events);
   };
-  ::bufferevent_setcb(outgoing_, readcb, writecb, eventcb, this);
-  ::bufferevent_enable(outgoing_, EV_READ | EV_WRITE);
+  ::bufferevent_setcb(outgoing_, nullptr, nullptr, eventcb, this);
 
   int ret = ::bufferevent_socket_connect(outgoing_, reinterpret_cast<struct
                                          sockaddr*>(&remote_addr_),

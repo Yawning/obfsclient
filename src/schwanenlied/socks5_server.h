@@ -229,7 +229,7 @@ class Socks5Server {
     bool outgoing_valid_; /**< outgoing_ connected? */
 
     /** @{ */
-    /** The Client to SOCKS server libevent2 bufferevent read callback */
+    /** The Client to SOCKS server bufferevent read callback */
     void incoming_read_cb();
 
     /** The State::kREAD_METHODS read callback */
@@ -241,16 +241,19 @@ class Socks5Server {
     /** The State::kREAD_REQUEST read callback */
     void incoming_read_request_cb();
 
-    /** The SOCKS server to Client libevent2 bufferevent write callback */
+    /** The SOCKS server to Client bufferevent write callback */
     void incoming_write_cb();
 
     /** The Client to SOCKS server socket bufferevent event callback */
     void incoming_event_cb(const short events);
 
-    /** The Remote peer to SOCKS server libevent2 bufferevent read callback */
+    /** The SOCKS server to Remote peer bufferevent connect callback */
+    void outgoing_connect_cb(const short events);
+
+    /** The Remote peer to SOCKS server bufferevent read callback */
     void outgoing_read_cb();
 
-    /** The SOCKS server to Remote peer libevent2 bufferevent write callback */
+    /** The SOCKS server to Remote peer bufferevent write callback */
     void outgoing_write_cb();
 
     /** The SOCKS server to Remote peer socket bufferevent event callback */
