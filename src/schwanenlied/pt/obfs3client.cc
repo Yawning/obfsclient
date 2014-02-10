@@ -147,10 +147,8 @@ void Obfs3Client::on_outgoing_data() {
   if (!received_magic_) {
     struct evbuffer* buf = ::bufferevent_get_input(outgoing_);
     size_t len = ::evbuffer_get_length(buf);
-    if (len > kMaxPadding) {
-      delete this;
+    if (len < responder_magic_.size())
       return;
-    }
 
     auto found = ::evbuffer_search(buf, reinterpret_cast<const char*>(responder_magic_.data()),
                                    responder_magic_.size(), nullptr);
