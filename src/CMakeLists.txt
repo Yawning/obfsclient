@@ -2,6 +2,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
 set(obfsclient_SRCS
   schwanenlied/crypto/aes_ctr128.cc
+  schwanenlied/crypto/base32.cc
   schwanenlied/crypto/hmac_sha256.cc
   schwanenlied/crypto/sha256.cc
   schwanenlied/crypto/uniform_dh.cc
@@ -17,6 +18,7 @@ add_library(gtest_main gtest/gtest_main.cc)
 
 set(obfsclient_test_SRCS
   schwanenlied/crypto/aes_ctr128_test.cc
+  schwanenlied/crypto/base32_test.cc
   schwanenlied/crypto/hmac_sha256_test.cc
   schwanenlied/crypto/sha256_test.cc
   schwanenlied/crypto/uniform_dh_test.cc
