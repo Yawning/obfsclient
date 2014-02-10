@@ -221,8 +221,7 @@ error_reply:
     state_ = State::kFLUSHING_INCOMING;
   }
 
-  int ret = ::bufferevent_write(incoming_, resp, resp_len);
-  if (ret != 0)
+  if (0 != ::bufferevent_write(incoming_, resp, resp_len))
     delete this;
   else if (state_ == State::kESTABLISHED)
     ::bufferevent_enable(incoming_, EV_READ);
@@ -311,8 +310,7 @@ out_free:
     auth_method_ = AuthMethod::kNONE_REQUIRED;
 
   uint8_t method[2] = { kSocksVersion, auth_method_ };
-  int ret = ::bufferevent_write(incoming_, method, sizeof(method));
-  if (ret != 0)
+  if (0 != ::bufferevent_write(incoming_, method, sizeof(method)))
     goto out_free;
 
   ::evbuffer_drain(buf, 2 + nmethods);
@@ -353,8 +351,7 @@ void Socks5Server::Session::incoming_read_auth_cb() {
 out_fail:
     // Send a failure response
     const uint8_t resp[2] = { 0x01, 0xff };
-    int ret = ::bufferevent_write(incoming_, resp, sizeof(resp));
-    if (ret != 0) {
+    if (0 != ::bufferevent_write(incoming_, resp, sizeof(resp))) {
       delete this;
       return;
     }
@@ -386,8 +383,7 @@ out_fail:
 
   if (on_client_authenticate(uname, ulen, passwd, plen)) {
     const uint8_t resp[2] = { 0x01, 0x00 };
-      int ret = ::bufferevent_write(incoming_, resp, sizeof(resp));
-    if (ret != 0) {
+    if (0 != ::bufferevent_write(incoming_, resp, sizeof(resp))) {
       delete this;
       return;
     }

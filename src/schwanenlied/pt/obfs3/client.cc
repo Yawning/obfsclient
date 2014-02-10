@@ -44,9 +44,8 @@ void Client::on_outgoing_connected() {
 
   // Send the public key
   const auto public_key = uniform_dh_.public_key();
-  int ret = ::bufferevent_write(outgoing_, public_key.data(),
-                                public_key.size());
-  if (ret != 0) {
+  if (0 != ::bufferevent_write(outgoing_, public_key.data(),
+                               public_key.size())) {
 out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
@@ -58,8 +57,7 @@ out_error:
     uint8_t padding[kMaxPadding / 2];
     ::evutil_secure_rng_get_bytes(padding, padlen);
 
-    ret = ::bufferevent_write(outgoing_, padding, padlen);
-    if (ret != 0)
+    if (0 != ::bufferevent_write(outgoing_, padding, padlen))
       goto out_error;
   }
 }
@@ -74,15 +72,15 @@ void Client::on_incoming_data() {
     if (padlen > 0) {
       uint8_t padding[kMaxPadding / 2];
       ::evutil_secure_rng_get_bytes(padding, padlen);
-      if (::bufferevent_write(outgoing_, padding, padlen) != 0) {
+      if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
         delete this;
         return;
       }
     }
 
     // Send initiator_magic_
-    if (::bufferevent_write(outgoing_, initiator_magic_.data(),
-                            initiator_magic_.size()) != 0) {
+    if (0 != ::bufferevent_write(outgoing_, initiator_magic_.data(),
+                                 initiator_magic_.size())) {
       delete this;
       return;
     }

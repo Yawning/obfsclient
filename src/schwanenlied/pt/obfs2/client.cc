@@ -52,8 +52,7 @@ void Client::on_outgoing_connected() {
   };
 
   // Derive INIT_SEED
-  int ret = ::RAND_bytes(&init_seed_[0], init_seed_.size());
-  if (ret != 1) {
+  if (1 != ::RAND_bytes(&init_seed_[0], init_seed_.size())) {
 out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
@@ -94,13 +93,11 @@ out_error:
     goto out_error;
 
   // Send init_seed
-  ret = ::bufferevent_write(outgoing_, init_seed_.data(), init_seed_.size());
-  if (ret != 0)
+  if (0 != ::bufferevent_write(outgoing_, init_seed_.data(), init_seed_.size()))
     goto out_error;
 
   // Send the header
-  ret = ::bufferevent_write(outgoing_, pad_hdr, sizeof(pad_hdr));
-  if (ret != 0)
+  if (0 != ::bufferevent_write(outgoing_, pad_hdr, sizeof(pad_hdr)))
     goto out_error;
 
   // Generate and send the random data
@@ -111,8 +108,7 @@ out_error:
     if (!initiator_aes_.process(padding, padlen, padding))
       goto out_error;
 
-    ret = ::bufferevent_write(outgoing_, padding, padlen);
-    if (ret != 0)
+    if (0 != ::bufferevent_write(outgoing_, padding, padlen))
       goto out_error;
   }
 }
