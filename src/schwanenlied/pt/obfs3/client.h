@@ -1,5 +1,5 @@
 /**
- * @file    obfs3client.h
+ * @file    obfs3/client.h
  * @author  Yawning Angel (yawning at schwanenlied dot me)
  * @brief   obfs3 (The Threebfuscator) Client
  */
@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SCHWANENLIED_PT_OBFS3CLIENT_H__
-#define SCHWANENLIED_PT_OBFS3CLIENT_H__
+#ifndef SCHWANENLIED_PT_OBFS3_CLIENT_H__
+#define SCHWANENLIED_PT_OBFS3_CLIENT_H__
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
@@ -43,6 +43,9 @@
 namespace schwanenlied {
 namespace pt {
 
+/** obfs3 (The Threebfuscator) */
+namespace obfs3 {
+
 /**
  * obfs3 (The Threebfuscator) Client
  *
@@ -51,30 +54,30 @@ namespace pt {
  * @todo Investigate using evbuffer_peek()/evbuffer_add_buffer() for better
  * performance (current code is more obviously correct).
  */
-class Obfs3Client : public Socks5Server::Session {
+class Client : public Socks5Server::Session {
  public:
-  /** Obfs3Client factory */
+  /** Client factory */
   class SessionFactory : public Socks5Server::SessionFactory {
    public:
     Socks5Server::Session* create_session(struct event_base* base,
                                           const evutil_socket_t sock,
                                           const struct sockaddr* addr,
                                           const int addr_len) override {
-      return new Obfs3Client(base, sock, addr, addr_len);
+      return new Client(base, sock, addr, addr_len);
     }
   };
 
-  Obfs3Client(struct event_base* base,
-              const evutil_socket_t sock,
-              const struct sockaddr* addr,
-              const int addr_len) :
+  Client(struct event_base* base,
+         const evutil_socket_t sock,
+         const struct sockaddr* addr,
+         const int addr_len) :
       Session(base, sock, addr, addr_len, false),
       sent_magic_(false),
       received_magic_(false),
       initiator_magic_(crypto::HmacSha256::kDigestLength, 0),
       responder_magic_(crypto::HmacSha256::kDigestLength, 0) {}
 
-  ~Obfs3Client() = default;
+  ~Client() = default;
 
  protected:
   void on_outgoing_connected() override;
@@ -86,8 +89,8 @@ class Obfs3Client : public Socks5Server::Session {
   void on_outgoing_data() override;
 
  private:
-  Obfs3Client(const Obfs3Client&) = delete;
-  void operator=(const Obfs3Client&) = delete;
+  Client(const Client&) = delete;
+  void operator=(const Client&) = delete;
 
   static const uint16_t kMaxPadding = 8194; /** obfs3 MAX_PADDING */
 
@@ -120,7 +123,8 @@ class Obfs3Client : public Socks5Server::Session {
   /** @} */
 };
 
+} // namespace obfs3
 } // namespace pt
 } // namespace schwanenlied
 
-#endif // SCHWANENLIED_PT_OBFS3CLIENT_H__
+#endif // SCHWANENLIED_PT_OBFS3_CLIENT_H__

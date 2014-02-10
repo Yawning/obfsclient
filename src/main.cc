@@ -44,13 +44,13 @@
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
-#include "schwanenlied/pt/obfs2client.h"
-#include "schwanenlied/pt/obfs3client.h"
+#include "schwanenlied/pt/obfs2/client.h"
+#include "schwanenlied/pt/obfs3/client.h"
 
 using Socks5Server = schwanenlied::Socks5Server;
 using Socks5Factory = schwanenlied::Socks5Server::SessionFactory;
-using Obfs2Factory = schwanenlied::pt::Obfs2Client::SessionFactory;
-using Obfs3Factory = schwanenlied::pt::Obfs3Client::SessionFactory;
+using Obfs2Factory = schwanenlied::pt::obfs2::Client::SessionFactory;
+using Obfs3Factory = schwanenlied::pt::obfs3::Client::SessionFactory;
 
 static const char kObfs2MethodName[] = "obfs2";
 static const char kObfs3MethodName[] = "obfs3";

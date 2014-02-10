@@ -1,5 +1,5 @@
 /**
- * @file    obfs3client.cc
+ * @file    obfs3/client.cc
  * @author  Yawning Angel (yawning at schwanenlied dot me)
  * @brief   obfs3 (The Threebfuscator) Client (IMPLEMENTATION)
  */
@@ -31,15 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <event2/event.h>
 #include <event2/buffer.h>
 
-#include "schwanenlied/pt/obfs3client.h"
+#include "schwanenlied/pt/obfs3/client.h"
 
 namespace schwanenlied {
 namespace pt {
+namespace obfs3 {
 
-void Obfs3Client::on_outgoing_connected() {
+void Client::on_outgoing_connected() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
   // Send the public key
@@ -64,7 +64,7 @@ out_error:
   }
 }
 
-void Obfs3Client::on_incoming_data() {
+void Client::on_incoming_data() {
   if (state_ != State::kESTABLISHED)
     return;
   
@@ -111,7 +111,7 @@ void Obfs3Client::on_incoming_data() {
   ::evbuffer_drain(buf, len);
 }
 
-void Obfs3Client::on_outgoing_data_connecting() {
+void Client::on_outgoing_data_connecting() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
   struct evbuffer* buf = ::bufferevent_get_input(outgoing_);
@@ -140,7 +140,7 @@ out_error:
   send_socks5_response(Reply::kSUCCEDED);
 }
 
-void Obfs3Client::on_outgoing_data() {
+void Client::on_outgoing_data() {
   if (state_ != State::kESTABLISHED)
     return;
 
@@ -184,7 +184,7 @@ void Obfs3Client::on_outgoing_data() {
   ::evbuffer_drain(buf, len);
 }
 
-bool Obfs3Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
+bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
   const static uint8_t init_data[] = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
@@ -246,7 +246,7 @@ bool Obfs3Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
   return true;
 }
 
-uint16_t Obfs3Client::gen_padlen() const {
+uint16_t Client::gen_padlen() const {
   uint16_t ret;
 
   // Sigh, why 8194 instead of 8192 - 1 :(
@@ -260,5 +260,6 @@ uint16_t Obfs3Client::gen_padlen() const {
   return ret;
 }
 
+} // namespace obfs3
 } // namespace pt
 } // namespace schwanenlied

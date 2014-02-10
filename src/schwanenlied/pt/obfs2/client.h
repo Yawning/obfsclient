@@ -1,5 +1,5 @@
 /**
- * @file    obfs2client.h
+ * @file    obfs2/client.h
  * @author  Yawning Angel (yawning at schwanenlied dot me)
  * @brief   obfs2 (The Twobfuscator) Client
  */
@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SCHWANENLIED_PT_OBFS2CLIENT_H__
-#define SCHWANENLIED_PT_OBFS2CLIENT_H__
+#ifndef SCHWANENLIED_PT_OBFS2_CLIENT_H__
+#define SCHWANENLIED_PT_OBFS2_CLIENT_H__
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
@@ -42,6 +42,9 @@
 namespace schwanenlied {
 namespace pt {
 
+/** obfs2 (The Twobfuscator) */
+namespace obfs2 {
+
 /**
  * obfs2 (The Twobfuscator) Client
  *
@@ -50,29 +53,29 @@ namespace pt {
  * @todo Investigate using evbuffer_peek()/evbuffer_add_buffer() for better
  * performance (current code is more obviously correct).
  */
-class Obfs2Client : public Socks5Server::Session {
+class Client : public Socks5Server::Session {
  public:
-  /** Obfs2Client factory */
+  /** Client factory */
   class SessionFactory : public Socks5Server::SessionFactory {
     Socks5Server::Session* create_session(struct event_base* base,
                                           const evutil_socket_t sock,
                                           const struct sockaddr *addr,
                                           const int addr_len) override {
-      return new Obfs2Client(base, sock, addr, addr_len);
+      return new Client(base, sock, addr, addr_len);
     }
   };
 
-  Obfs2Client(struct event_base* base,
-              const evutil_socket_t sock,
-              const struct sockaddr* addr,
-              const int addr_len) :
+  Client(struct event_base* base,
+         const evutil_socket_t sock,
+         const struct sockaddr* addr,
+         const int addr_len) :
       Session(base, sock, addr, addr_len),
       received_seed_hdr_(false),
       resp_pad_len_(0),
       init_seed_(kSeedLength, 0),
       resp_seed_(kSeedLength, 0) {}
 
-  ~Obfs2Client() = default;
+  ~Client() = default;
 
  protected:
   void on_outgoing_connected() override;
@@ -84,8 +87,8 @@ class Obfs2Client : public Socks5Server::Session {
   void on_outgoing_data() override;
 
  private:
-  Obfs2Client(const Obfs2Client&) = delete;
-  void operator=(const Obfs2Client&) = delete;
+  Client(const Client&) = delete;
+  void operator=(const Client&) = delete;
 
   /** @{ */
   static const uint32_t kMagicValue = 0x2BF5CA7E; /**< obfs2 MAGIC_VALUE */
@@ -138,7 +141,8 @@ class Obfs2Client : public Socks5Server::Session {
   /** @} */
 };
 
+} // namespace obfs2
 } // namespace pt
 } // namespace schwanenlied
 
-#endif
+#endif // SCHWANENLIED_PT_OBFS2_CLIENT_H__

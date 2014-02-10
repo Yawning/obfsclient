@@ -6,8 +6,8 @@ set(obfsclient_SRCS
   schwanenlied/crypto/sha256.cc
   schwanenlied/crypto/uniform_dh.cc
   schwanenlied/crypto/utils.cc
-  schwanenlied/pt/obfs2client.cc
-  schwanenlied/pt/obfs3client.cc
+  schwanenlied/pt/obfs2/client.cc
+  schwanenlied/pt/obfs3/client.cc
   schwanenlied/socks5_server.cc
 )
 

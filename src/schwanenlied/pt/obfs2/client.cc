@@ -1,5 +1,5 @@
 /**
- * @file    obfs2client.cc
+ * @file    obfs2/client.cc
  * @author  Yawning Angel (yawning at schwanenlied dot me)
  * @brief   obfs2 (The Twobfuscator) Client (IMPLEMENTATION)
  */
@@ -31,19 +31,20 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <event2/event.h>
 #include <event2/buffer.h>
+
 #include <openssl/rand.h>
 
 #include <algorithm>
 #include <cstring>
 
-#include "schwanenlied/pt/obfs2client.h"
+#include "schwanenlied/pt/obfs2/client.h"
 
 namespace schwanenlied {
 namespace pt {
+namespace obfs2 {
 
-void Obfs2Client::on_outgoing_connected() {
+void Client::on_outgoing_connected() {
   static const uint8_t init_mac_key[] = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'i', 'o', 'n', ' ',
@@ -116,7 +117,7 @@ out_error:
   }
 }
 
-void Obfs2Client::on_incoming_data() {
+void Client::on_incoming_data() {
   if (state_ != State::kESTABLISHED)
     return;
 
@@ -139,7 +140,7 @@ out_error:
   ::evbuffer_drain(buf, len);
 }
 
-void Obfs2Client::on_outgoing_data_connecting() {
+void Client::on_outgoing_data_connecting() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
   struct evbuffer* buf = ::bufferevent_get_input(outgoing_);
@@ -208,7 +209,7 @@ out_error:
   send_socks5_response(Reply::kSUCCEDED);
 }
 
-void Obfs2Client::on_outgoing_data() {
+void Client::on_outgoing_data() {
   if (state_ != State::kESTABLISHED)
     return;
 
@@ -231,11 +232,11 @@ out_error:
   ::evbuffer_drain(buf, len);
 }
 
-bool Obfs2Client::mac(const uint8_t* key,
-                      const size_t key_len,
-                      const uint8_t* buf,
-                      const size_t len,
-                      crypto::SecureBuffer& digest) {
+bool Client::mac(const uint8_t* key,
+                 const size_t key_len,
+                 const uint8_t* buf,
+                 const size_t len,
+                 crypto::SecureBuffer& digest) {
   if (key == nullptr)
     return false;
   if (key_len == 0)
@@ -256,7 +257,7 @@ bool Obfs2Client::mac(const uint8_t* key,
   return sha.digest(to_sha.data(), to_sha.size(), &digest[0], digest.size());
 }
 
-bool Obfs2Client::kdf_obfs2() {
+bool Client::kdf_obfs2() {
   const static uint8_t init_data[] = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
@@ -301,7 +302,7 @@ bool Obfs2Client::kdf_obfs2() {
   return true;
 }
 
-uint32_t Obfs2Client::gen_padlen() const {
+uint32_t Client::gen_padlen() const {
   uint32_t ret;
 
   // Sigh, why 8192 instead of 8192 - 1 :(
@@ -315,5 +316,6 @@ uint32_t Obfs2Client::gen_padlen() const {
   return ret;
 }
 
+} // namespace obfs2
 } // namespace pt
 } // namespace schwanenlied
