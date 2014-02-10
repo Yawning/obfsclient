@@ -118,23 +118,23 @@ void Client::on_outgoing_data_connecting() {
 
   // Read the peer's public key
   size_t len = ::evbuffer_get_length(buf);
-  if (len < crypto::UniformDH::kKeySz)
+  if (len < crypto::UniformDH::kKeyLength)
     return;
 
-  uint8_t *p = ::evbuffer_pullup(buf, crypto::UniformDH::kKeySz);
+  uint8_t *p = ::evbuffer_pullup(buf, crypto::UniformDH::kKeyLength);
   if (p == nullptr) {
 out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
-  if (!uniform_dh_.compute_key(p, crypto::UniformDH::kKeySz))
+  if (!uniform_dh_.compute_key(p, crypto::UniformDH::kKeyLength))
     goto out_error;
 
   // Apply the KDF and initialize the crypto
   if (!kdf_obfs3(uniform_dh_.shared_secret()))
     goto out_error;
 
-  ::evbuffer_drain(buf, crypto::UniformDH::kKeySz);
+  ::evbuffer_drain(buf, crypto::UniformDH::kKeyLength);
 
   // Handshaked
   send_socks5_response(Reply::kSUCCEDED);

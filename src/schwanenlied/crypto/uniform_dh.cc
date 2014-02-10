@@ -78,9 +78,9 @@ static const unsigned char rfc3526_group_5_g[] = {
 
 UniformDH::UniformDH() :
     ctx_(::DH_new()),
-    public_key_(kKeySz, 0),
+    public_key_(kKeyLength, 0),
     has_shared_secret_(false),
-    shared_secret_(kKeySz, 0) {
+    shared_secret_(kKeyLength, 0) {
   SL_ASSERT(ctx_ != nullptr);  
 
   /* Create the DH context */
@@ -92,7 +92,7 @@ UniformDH::UniformDH() :
   SL_ASSERT(ctx_->p != nullptr);
   SL_ASSERT(ctx_->g != nullptr);
   SL_ASSERT(ctx_->priv_key != nullptr);
-  SL_ASSERT(::DH_size(ctx_) == kKeySz);
+  SL_ASSERT(::DH_size(ctx_) == kKeyLength);
 
   /*
    * To pick a private UniformDH key, we pick a random 1536-bit number,
@@ -100,7 +100,7 @@ UniformDH::UniformDH() :
    * key, and X = g^x (mod p).
    */
 
-  int ret = ::BN_rand(ctx_->priv_key, kKeySz * 8, -1, 0);
+  int ret = ::BN_rand(ctx_->priv_key, kKeyLength * 8, -1, 0);
   SL_ASSERT(ret == 1);
   const bool is_odd = BN_is_odd(ctx_->priv_key);
   ret = ::BN_clear_bit(ctx_->priv_key, 0);
@@ -122,7 +122,7 @@ UniformDH::UniformDH() :
   const int offset = public_key_.size() - BN_num_bytes(ctx_->pub_key);
   ret = ::BN_bn2bin(ctx_->pub_key, reinterpret_cast<unsigned
                     char*>(&public_key_[offset]));
-  SL_ASSERT(ret + offset == kKeySz); 
+  SL_ASSERT(ret + offset == kKeyLength);
 }
 
 UniformDH::~UniformDH() {
@@ -134,7 +134,7 @@ bool UniformDH::compute_key(const uint8_t* pub_key,
                             const size_t len) {
   if (pub_key == nullptr)
     return false;
-  if (len != kKeySz)
+  if (len != kKeyLength)
     return false;
   SL_ASSERT(has_shared_secret_ == false);
 

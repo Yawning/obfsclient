@@ -54,7 +54,7 @@ namespace crypto {
 class UniformDH {
  public:
   /** The key length in bytes */
-  static const size_t kKeySz = 1536 / 8;
+  static const size_t kKeyLength = 1536 / 8;
 
   /**
    * Construct a UniformDH instance
@@ -70,7 +70,7 @@ class UniformDH {
    * private key before this ever returns with true.
    *
    * @param[in] pub_key   A pointer to the peer's public key
-   * @param[in] len       The length of the key (MUST be kKeySz bytes)
+   * @param[in] len       The length of the key (MUST be kKeyLength bytes)
    *
    * @returns true  - Success
    * @returns false - Failure
