@@ -65,7 +65,7 @@ bool HmacSha256::update(const uint8_t* buf,
     return false;
   if (buf == nullptr && len != 0)
     return false;
-  if (stream_state_ != State::kINIT || stream_state_ != State::kUPDATE)
+  if (stream_state_ != State::kINIT && stream_state_ != State::kUPDATE)
     return false;
   if (len == 0)
     return true;
@@ -84,7 +84,7 @@ bool HmacSha256::final(uint8_t* out,
     return false;
   if (out_len == 0)
     return false;
-  if (stream_state_ != State::kINIT || stream_state_ != State::kUPDATE)
+  if (stream_state_ != State::kINIT && stream_state_ != State::kUPDATE)
     return false;
   if (out_len > kDigestLength)
     return false;
