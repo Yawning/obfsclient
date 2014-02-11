@@ -44,9 +44,7 @@ bool HmacSha256::digest(const uint8_t* buf,
                         const size_t len,
                         uint8_t* out,
                         const size_t out_len) const {
-  if (buf == nullptr)
-    return false;
-  if (len == 0)
+  if (buf == nullptr && len != 0)
     return false;
   if (out == nullptr)
     return false;
