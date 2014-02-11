@@ -69,9 +69,10 @@ out_error:
   if (!mac(init_mac_key, sizeof(init_mac_key), init_seed_.data(),
            init_seed_.size(), init_pad_key))
     goto out_error;
-  if (!initiator_aes_.set_state(init_pad_key.substr(0, crypto::AesCtr128::kKeyLength),
-                                init_pad_key.data() + crypto::AesCtr128::kKeyLength,
-                                init_pad_key.size() - crypto::AesCtr128::kKeyLength))
+  if (!initiator_aes_.set_state(init_pad_key.substr(0, crypto::kAes128KeyLength),
+                                nullptr, 0,
+                                init_pad_key.data() + crypto::kAes128KeyLength,
+                                init_pad_key.size() - crypto::kAes128KeyLength))
     goto out_error;
 
   /*
@@ -166,9 +167,10 @@ out_error:
     if (!mac(resp_mac_key, sizeof(resp_mac_key), resp_seed_.data(),
            resp_seed_.size(), resp_pad_key))
       goto out_error;
-    if (!responder_aes_.set_state(resp_pad_key.substr(0, crypto::AesCtr128::kKeyLength),
-                                  resp_pad_key.data() + crypto::AesCtr128::kKeyLength,
-                                  resp_pad_key.size() - crypto::AesCtr128::kKeyLength))
+    if (!responder_aes_.set_state(resp_pad_key.substr(0, crypto::kAes128KeyLength),
+                                  nullptr, 0,
+                                  resp_pad_key.data() + crypto::kAes128KeyLength,
+                                  resp_pad_key.size() - crypto::kAes128KeyLength))
       goto out_error;
 
     // Validate the header and obtain padlen
@@ -277,9 +279,10 @@ bool Client::kdf_obfs2() {
   if (!mac(init_data, sizeof(init_data), to_mac.data(), to_mac.size(),
            sekrit))
     return false;
-  if (!initiator_aes_.set_state(sekrit.substr(0, crypto::AesCtr128::kKeyLength),
-                                sekrit.data() + crypto::AesCtr128::kKeyLength,
-                                sekrit.size() - crypto::AesCtr128::kKeyLength))
+  if (!initiator_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),
+                                nullptr, 0,
+                                sekrit.data() + crypto::kAes128KeyLength,
+                                sekrit.size() - crypto::kAes128KeyLength))
     return false;
 
   /*
@@ -290,9 +293,10 @@ bool Client::kdf_obfs2() {
   if (!mac(resp_data, sizeof(resp_data), to_mac.data(), to_mac.size(),
            sekrit))
     return false;
-  if (!responder_aes_.set_state(sekrit.substr(0, crypto::AesCtr128::kKeyLength),
-                                sekrit.data() + crypto::AesCtr128::kKeyLength,
-                                sekrit.size() - crypto::AesCtr128::kKeyLength))
+  if (!responder_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),
+                                nullptr, 0,
+                                sekrit.data() + crypto::kAes128KeyLength,
+                                sekrit.size() - crypto::kAes128KeyLength))
     return false;
 
   return true;

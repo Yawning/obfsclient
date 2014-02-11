@@ -36,7 +36,7 @@
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
-#include "schwanenlied/crypto/aes_ctr128.h"
+#include "schwanenlied/crypto/aes.h"
 #include "schwanenlied/crypto/sha256.h"
 
 namespace schwanenlied {
@@ -129,8 +129,8 @@ class Client : public Socks5Server::Session {
   /** @} */
 
   /** @{ */
-  crypto::AesCtr128 initiator_aes_; /**< Initiator->Responder E(K,s) */
-  crypto::AesCtr128 responder_aes_; /**< Responder->Initiator E(K,s) */
+  crypto::Aes128Ctr initiator_aes_; /**< Initiator->Responder E(K,s) */
+  crypto::Aes128Ctr responder_aes_; /**< Responder->Initiator E(K,s) */
   /** @} */
 
   /** @{ */

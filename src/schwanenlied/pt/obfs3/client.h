@@ -36,7 +36,7 @@
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
-#include "schwanenlied/crypto/aes_ctr128.h"
+#include "schwanenlied/crypto/aes.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
 #include "schwanenlied/crypto/uniform_dh.h"
 
@@ -111,8 +111,8 @@ class Client : public Socks5Server::Session {
 
   /** @{ */
   crypto::UniformDH uniform_dh_;    /**< The UniformDH keypair */
-  crypto::AesCtr128 initiator_aes_; /**< E(INIT_KEY, DATA) */
-  crypto::AesCtr128 responder_aes_; /**< E(RESP_KEY, DATA) */
+  crypto::Aes128Ctr initiator_aes_; /**< E(INIT_KEY, DATA) */
+  crypto::Aes128Ctr responder_aes_; /**< E(RESP_KEY, DATA) */
   /** @} */
 
   /** @{ */

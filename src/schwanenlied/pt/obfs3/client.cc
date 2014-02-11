@@ -213,9 +213,10 @@ bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
    */
   if (!hmac.digest(init_data, sizeof(init_data), &sekrit[0], sekrit.size()))
     return false;
-  if (!initiator_aes_.set_state(sekrit.substr(0, crypto::AesCtr128::kKeyLength),
-                                sekrit.data() + crypto::AesCtr128::kKeyLength,
-                                sekrit.size() - crypto::AesCtr128::kKeyLength))
+  if (!initiator_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),
+                                nullptr, 0,
+                                sekrit.data() + crypto::kAes128KeyLength,
+                                sekrit.size() - crypto::kAes128KeyLength))
     return false;
 
   /*
@@ -225,9 +226,10 @@ bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
    */
   if (!hmac.digest(resp_data, sizeof(resp_data), &sekrit[0], sekrit.size()))
     return false;
-  if (!responder_aes_.set_state(sekrit.substr(0, crypto::AesCtr128::kKeyLength),
-                                sekrit.data() + crypto::AesCtr128::kKeyLength,
-                                sekrit.size() - crypto::AesCtr128::kKeyLength))
+  if (!responder_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),
+                                nullptr, 0,
+                                sekrit.data() + crypto::kAes128KeyLength,
+                                sekrit.size() - crypto::kAes128KeyLength))
     return false;
 
   /*
