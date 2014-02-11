@@ -11,6 +11,10 @@ This is a C++11 client implementation of the following protocols:
  * [obfs2](https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs2/obfs2-protocol-spec.txt) - The Twobfuscator
    * The shared secret mode is not used in the wild and is unsupported.
  * [obfs3](https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs3/obfs3-protocol-spec.txt) - The Threebfuscator
+ * [ScrambleSuit](https://github.com/NullHypothesis/scramblesuit/blob/master/doc/scramblesuit-spec.txt) - *EXPERIMENTAL*
+   * This requires tor-0.2.5.x or later for Pluggable Transport arguments.
+   * The Session Ticket Handshake is not implemented yet.
+   * Protocol Polymorphism is not implemented yet.
 
 By design will only function as a ClientTransportPlugin for Tor.  It does use a
 reasonably complete implementation of the Pluggable Transport spec so when used
@@ -48,7 +52,8 @@ In your torrc:
     UseBridges 1
     Bridge obfs2 ip:port fingerprint
     Bridge obfs3 ip:port fingerprint
-    ClientTransportPlugin obfs2,obfs3 exec /path/to/the/binary/obfsclient
+    Bridge scramblesuit ip:port password=sharedsecret
+    ClientTransportPlugin obfs2,obfs3,scramblesuit exec /path/to/the/binary/obfsclient
 
 ### Implementation notes
 
@@ -73,7 +78,7 @@ Caveats:
 
  * Logging would be nice (Maybe?  It Just Works (TM)).
  * A connection timeout.
- * Assuming people actually want to use this, add support for ScrambleSuite.
+ * Implement the missing ScrambleSuit features.
  * The build system sucks.
 
 ### WON'T DO
