@@ -130,7 +130,7 @@ TEST_F(AesCtr128Test, SP800_38A_Encrypt) {
     uint8_t ct[16];
     ASSERT_TRUE(aes.process(vectors[i].plaintext,
                             sizeof(vectors[i].plaintext), ct));
-    ASSERT_EQ(0, memequals(ct, vectors[i].ciphertext, sizeof(ct)));
+    ASSERT_TRUE(memequals(ct, vectors[i].ciphertext, sizeof(ct)));
   }
 }
 
@@ -220,7 +220,7 @@ TEST_F(AesCtr128Test, SP800_38A_Decrypt) {
     uint8_t pt[16];
     ASSERT_TRUE(aes.process(vectors[i].ciphertext,
                             sizeof(vectors[i].ciphertext), pt));
-    ASSERT_EQ(0, memequals(pt, vectors[i].plaintext, sizeof(pt)));
+    ASSERT_TRUE(memequals(pt, vectors[i].plaintext, sizeof(pt)));
   }
 }
 

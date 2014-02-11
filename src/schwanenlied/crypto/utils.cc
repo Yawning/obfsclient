@@ -47,9 +47,9 @@ void* memwipe(void* s,
   return s;
 }
 
-int memequals(const void* s1,
-              const void* s2,
-              const size_t n)
+bool  memequals(const void* s1,
+                const void* s2,
+                const size_t n)
 {
   const uint8_t* a = static_cast<const uint8_t*>(s1);
   const uint8_t* b = static_cast<const uint8_t*>(s2);
@@ -58,7 +58,7 @@ int memequals(const void* s1,
   for (size_t i = 0; i < n; i++)
     ret |= a[i] ^ b[i];
 
-  return ret;
+  return (!ret);
 }
 
 } // namespace crypto

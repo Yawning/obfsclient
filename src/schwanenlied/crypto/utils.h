@@ -58,11 +58,13 @@ void* memwipe(void* s,
  * @param[in] s1  The first buffer
  * @param[in] s2  The second buffer
  * @param[in] n   The length of the buffers
- * @return 0 if the buffers are equal, something else if not
+ *
+ * @returns true - The buffers are equal
+ * @returns false - The buffers are different
  */
-int memequals(const void* s1,
-              const void* s2,
-              const size_t n);
+bool memequals(const void* s1,
+               const void* s2,
+               const size_t n);
 
 /**
  * A custom allocator that calls memwipe() on deallocate

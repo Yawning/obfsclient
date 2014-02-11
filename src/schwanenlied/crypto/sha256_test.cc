@@ -62,7 +62,7 @@ TEST_F(Sha256Test, NIST_NSRL_abc) {
   uint8_t digest[Sha256::kDigestLength];
 
   ASSERT_TRUE(sha.digest(data, sizeof(data), digest, sizeof(digest)));
-  ASSERT_EQ(0, memequals(expected, digest, sizeof(digest)));
+  ASSERT_TRUE(memequals(expected, digest, sizeof(digest)));
 }
 
 TEST_F(Sha256Test, NIST_NSRL_abc_dot_dot_dot) {
@@ -85,7 +85,7 @@ TEST_F(Sha256Test, NIST_NSRL_abc_dot_dot_dot) {
   uint8_t digest[Sha256::kDigestLength];
 
   ASSERT_TRUE(sha.digest(data, sizeof(data), digest, sizeof(digest)));
-  ASSERT_EQ(0, memequals(expected, digest, sizeof(digest)));
+  ASSERT_TRUE(memequals(expected, digest, sizeof(digest)));
 }
 
 TEST_F(Sha256Test, NIST_NSRL_omgLotsOfAs) {
@@ -101,7 +101,7 @@ TEST_F(Sha256Test, NIST_NSRL_omgLotsOfAs) {
   uint8_t digest[Sha256::kDigestLength];
 
   ASSERT_TRUE(sha.digest(omgLotsOfAs_, sizeof(omgLotsOfAs_), digest, sizeof(digest)));
-  ASSERT_EQ(0, memequals(expected, digest, sizeof(digest)));
+  ASSERT_TRUE(memequals(expected, digest, sizeof(digest)));
 }
 
 } // namespace crypto
