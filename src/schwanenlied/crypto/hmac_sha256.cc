@@ -63,12 +63,12 @@ bool HmacSha256::update(const uint8_t* buf,
                         const size_t len) {
   if (!has_key_)
     return false;
-  if (buf == nullptr)
-    return false;
-  if (len == 0)
+  if (buf == nullptr && len != 0)
     return false;
   if (stream_state_ != State::kINIT || stream_state_ != State::kUPDATE)
     return false;
+  if (len == 0)
+    return true;
 
   if (1 != ::HMAC_Update(&ctx_, buf, len))
     return false;
