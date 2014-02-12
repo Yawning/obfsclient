@@ -98,7 +98,7 @@ class Client : public Socks5Server::Session {
   /**
    * Given a shared secret, derive the AES-CTR-128 keys per the obfs3 spec
    *
-   * @param shared_secret The shared secret to use as the key material
+   * @param[in] shared_secret The shared secret to use as the key material
    *
    * @returns true  - Success
    * @returns false - Failure

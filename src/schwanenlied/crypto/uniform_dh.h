@@ -94,7 +94,7 @@ class UniformDH {
 
   DH* ctx_;                     /**< The DH context */
   ::std::string public_key_;    /**< The serialized form of the public key */
-  bool has_shared_secret_;      /**< Is a valid hared secret present? */
+  bool has_shared_secret_;      /**< Is a valid shared secret present? */
   SecureBuffer shared_secret_;  /**< The shared secret */
 };
 
