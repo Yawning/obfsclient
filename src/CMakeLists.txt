@@ -9,6 +9,8 @@ set(obfsclient_SRCS
   schwanenlied/crypto/utils.cc
   schwanenlied/pt/obfs2/client.cc
   schwanenlied/pt/obfs3/client.cc
+  schwanenlied/pt/scramblesuit/client.cc
+  schwanenlied/pt/scramblesuit/uniform_dh_handshake.cc
   schwanenlied/socks5_server.cc
 )
 
