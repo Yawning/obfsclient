@@ -152,6 +152,7 @@ class HmacSha256 {
     kINVALID, /**< init() has not been called */
     kINIT,    /**< init() has been called */
     kUPDATE,  /**< update() has been called */
+    kFINAL,   /**< final() has been called */
   } stream_state_;    /**< The streaming interface state */
 
   bool has_key_;      /**< The key is valid? */

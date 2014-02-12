@@ -73,6 +73,8 @@ bool HmacSha256::update(const uint8_t* buf,
   if (1 != ::HMAC_Update(&ctx_, buf, len))
     return false;
 
+  stream_state_ = State::kUPDATE;
+
   return true;
 }
 
@@ -88,7 +90,10 @@ bool HmacSha256::final(uint8_t* out,
     return false;
   if (out_len > kDigestLength)
     return false;
-  else if (out_len == kDigestLength) {
+
+  stream_state_ = State::kFINAL;
+
+  if (out_len == kDigestLength) {
     unsigned int digest_len = out_len;
     if (1 != ::HMAC_Final(&ctx_, out, &digest_len))
       return false;
