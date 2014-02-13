@@ -31,12 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+#include <algorithm>
+#include <array>
+#include <cstring>
+
 #include <event2/buffer.h>
 
 #include <openssl/rand.h>
-
-#include <algorithm>
-#include <cstring>
 
 #include "schwanenlied/pt/obfs2/client.h"
 
@@ -45,7 +47,7 @@ namespace pt {
 namespace obfs2 {
 
 void Client::on_outgoing_connected() {
-  static const uint8_t init_mac_key[] = {
+  const ::std::array<uint8_t, 29> init_mac_key = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'i', 'o', 'n', ' ',
     'p', 'a', 'd', 'd', 'i', 'n', 'g'
@@ -66,7 +68,7 @@ out_error:
    * from the MAC operation.
    */
   crypto::SecureBuffer init_pad_key(crypto::Sha256::kDigestLength, 0);
-  if (!mac(init_mac_key, sizeof(init_mac_key), init_seed_.data(),
+  if (!mac(init_mac_key.data(), init_mac_key.size(), init_seed_.data(),
            init_seed_.size(), init_pad_key))
     goto out_error;
   if (!initiator_aes_.set_state(init_pad_key.substr(0, crypto::kAes128KeyLength),
@@ -145,7 +147,7 @@ void Client::on_outgoing_data_connecting() {
   // Read the resp_seed, magic value and padlen
   if (!received_seed_hdr_) {
     const size_t seed_hdr_sz = kSeedLength + sizeof(uint32_t) * 2;
-    static const uint8_t resp_mac_key[] = {
+    const ::std::array<uint8_t, 29> resp_mac_key = {
       'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
       'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'i', 'o', 'n', ' ',
       'p', 'a', 'd', 'd', 'i', 'n', 'g'
@@ -164,7 +166,7 @@ out_error:
     // Obtain RESP_SEED, and derive RESP_PAD_KEY
     ::std::memcpy(&resp_seed_[0], p, resp_seed_.size());
     crypto::SecureBuffer resp_pad_key(crypto::Sha256::kDigestLength, 0);
-    if (!mac(resp_mac_key, sizeof(resp_mac_key), resp_seed_.data(),
+    if (!mac(resp_mac_key.data(), resp_mac_key.size(), resp_seed_.data(),
            resp_seed_.size(), resp_pad_key))
       goto out_error;
     if (!responder_aes_.set_state(resp_pad_key.substr(0, crypto::kAes128KeyLength),
@@ -256,16 +258,15 @@ bool Client::mac(const uint8_t* key,
 }
 
 bool Client::kdf_obfs2() {
-  const static uint8_t init_data[] = {
+  const ::std::array<uint8_t, 25> init_data = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'
   };
-  const static uint8_t resp_data[] = {
+  const ::std::array<uint8_t, 25> resp_data = {
     'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'
-
   };
 
   crypto::SecureBuffer to_mac = init_seed_ + resp_seed_;
@@ -276,7 +277,7 @@ bool Client::kdf_obfs2() {
    * INIT_KEY = INIT_SECRET[:KEYLEN]
    * INIT_IV = INIT_SECRET[KEYLEN:]
    */
-  if (!mac(init_data, sizeof(init_data), to_mac.data(), to_mac.size(),
+  if (!mac(init_data.data(), init_data.size(), to_mac.data(), to_mac.size(),
            sekrit))
     return false;
   if (!initiator_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),
@@ -290,7 +291,7 @@ bool Client::kdf_obfs2() {
    * RESP_KEY = RESP_SECRET[:KEYLEN]
    * RESP_IV = RESP_SECRET[KEYLEN:]
    */
-  if (!mac(resp_data, sizeof(resp_data), to_mac.data(), to_mac.size(),
+  if (!mac(resp_data.data(), resp_data.size(), to_mac.data(), to_mac.size(),
            sekrit))
     return false;
   if (!responder_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),

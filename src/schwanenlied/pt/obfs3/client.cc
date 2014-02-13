@@ -31,6 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <array>
+
 #include <event2/buffer.h>
 
 #include "schwanenlied/pt/obfs3/client.h"
@@ -95,17 +97,14 @@ void Client::on_incoming_data() {
 
   uint8_t *p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
+out_error:
     delete this;
     return;
   }
-  if (!initiator_aes_.process(p, len, p)) {
-    delete this;
-    return;
-  }
-  if (::bufferevent_write(outgoing_, p, len) != 0) {
-    delete this;
-    return;
-  }
+  if (!initiator_aes_.process(p, len, p))
+    goto out_error;
+  if (::bufferevent_write(outgoing_, p, len) != 0)
+    goto out_error;
   ::evbuffer_drain(buf, len);
 }
 
@@ -168,37 +167,34 @@ void Client::on_outgoing_data() {
 
   uint8_t *p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
+out_error:
     delete this;
     return;
   }
-  if (!responder_aes_.process(p, len, p)) {
-    delete this;
-    return;
-  }
-  if (::bufferevent_write(incoming_, p, len) != 0) {
-    delete this;
-    return;
-  }
+  if (!responder_aes_.process(p, len, p))
+    goto out_error;
+  if (::bufferevent_write(incoming_, p, len) != 0)
+    goto out_error;
   ::evbuffer_drain(buf, len);
 }
 
 bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
-  const static uint8_t init_data[] = {
+  const ::std::array<uint8_t, 25> init_data = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'
   };
-  const static uint8_t resp_data[] = {
+  const ::std::array<uint8_t, 25> resp_data = {
     'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'
 
   };
-  const static uint8_t init_magic[] = {
+  const ::std::array<uint8_t, 15> init_magic = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'm', 'a', 'g', 'i', 'c'
   };
-  const static uint8_t resp_magic[] = {
+  const ::std::array<uint8_t, 15> resp_magic = {
     'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
     'm', 'a', 'g', 'i', 'c'
   };
@@ -211,7 +207,8 @@ bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
    * INIT_KEY = INIT_SECRET[:KEYLEN]
    * INIT_COUNTER = INIT_SECRET[KEYLEN:]
    */
-  if (!hmac.digest(init_data, sizeof(init_data), &sekrit[0], sekrit.size()))
+  if (!hmac.digest(init_data.data(), init_data.size(), &sekrit[0],
+                   sekrit.size()))
     return false;
   if (!initiator_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),
                                 nullptr, 0,
@@ -224,7 +221,8 @@ bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
    * RESP_KEY = RESP_SECRET[:KEYLEN]
    * RESP_COUNTER = RESP_SECRET[KEYLEN:]
    */
-  if (!hmac.digest(resp_data, sizeof(resp_data), &sekrit[0], sekrit.size()))
+  if (!hmac.digest(resp_data.data(), resp_data.size(), &sekrit[0],
+                   sekrit.size()))
     return false;
   if (!responder_aes_.set_state(sekrit.substr(0, crypto::kAes128KeyLength),
                                 nullptr, 0,
@@ -236,10 +234,10 @@ bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
    * HMAC(SHARED_SECRET, "Initiator magic")
    * HMAC(SHARED_SECRET, "Responder magic") 
    */
-  if (!hmac.digest(init_magic, sizeof(init_magic), &initiator_magic_[0],
+  if (!hmac.digest(init_magic.data(), init_magic.size(), &initiator_magic_[0],
                    initiator_magic_.size()))
     return false;
-  if (!hmac.digest(resp_magic, sizeof(resp_magic), &responder_magic_[0],
+  if (!hmac.digest(resp_magic.data(), resp_magic.size(), &responder_magic_[0],
                    responder_magic_.size()))
     return false;
 
