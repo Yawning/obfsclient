@@ -63,7 +63,8 @@ class Client : public Socks5Server::Session {
                                           const evutil_socket_t sock,
                                           const struct sockaddr* addr,
                                           const int addr_len) override {
-      return new Client(base, sock, addr, addr_len);
+      return static_cast<Socks5Server::Session*>(new Client(base, sock, addr,
+                                                            addr_len));
     }
   };
 
