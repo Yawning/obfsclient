@@ -7917,9 +7917,12 @@ const DWORD kInvalidFileAttributes = 0xffffffff;
 const char kCurrentDirectoryString[] = ".\\";
 # endif  // GTEST_OS_WINDOWS_MOBILE
 #else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
 const char kPathSeparator = '/';
 const char kPathSeparatorString[] = "/";
 const char kCurrentDirectoryString[] = "./";
+#pragma clang diagnostic pop
 #endif  // GTEST_OS_WINDOWS
 
 // Returns whether the given character is a valid path separator.
