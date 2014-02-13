@@ -50,7 +50,7 @@ SecureBuffer extract(const uint8_t* salt,
 
   if (salt == nullptr) {
     SL_ASSERT(salt_len == 0);
-    const ::std::array<uint8_t, HmacSha256::kDigestLength> zero_salt = { 0 };
+    static constexpr ::std::array<uint8_t, HmacSha256::kDigestLength> zero_salt = {};
     ret &= h.set_key(SecureBuffer(zero_salt.data(), zero_salt.size()));
   } else
     ret &= h.set_key(SecureBuffer(salt, salt_len));

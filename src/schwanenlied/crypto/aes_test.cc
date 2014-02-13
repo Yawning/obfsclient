@@ -48,15 +48,15 @@ TEST_F(Aes128CtrTest, SP800_38A_Encrypt) {
   // F.5.1
   // CTR-AES128.Encrypt
   // Key 2b7e151628aed2a6abf7158809cf4f3c
-  const ::std::array<uint8_t, kAes128KeyLength> key = {
+  const ::std::array<uint8_t, kAes128KeyLength> key = { {
     0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
     0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c
-  };
+  } };
   // Init. Counter f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
-  const ::std::array<uint8_t, 16> ctr = {
+  const ::std::array<uint8_t, 16> ctr = { {
     0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
     0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
-  };
+  } };
   const test_vector vectors[] = {
     // Block #1
     // Input Block f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
@@ -138,15 +138,15 @@ TEST_F(Aes128CtrTest, SP800_38A_Decrypt) {
   // F.5.2
   // CTR-AES128.Decrypt
   // Key 2b7e151628aed2a6abf7158809cf4f3c
-  const ::std::array<uint8_t, kAes128KeyLength> key = {
+  const ::std::array<uint8_t, kAes128KeyLength> key = { {
     0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
     0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c
-  };
+  } };
   // Init. Counter f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
-  const ::std::array<uint8_t, 16> ctr = {
+  const ::std::array<uint8_t, 16> ctr = { {
     0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
     0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
-  };
+  } };
   const test_vector vectors[] = {
     // Block #1
     // Input Block f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff

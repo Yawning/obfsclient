@@ -46,6 +46,8 @@ namespace schwanenlied {
 namespace pt {
 namespace scramblesuit {
 
+constexpr size_t Client::kMaxPayloadLength;
+
 bool Client::on_client_authenticate(const uint8_t* uname,
                                     const uint8_t ulen,
                                     const uint8_t* passwd,
@@ -108,7 +110,7 @@ out_error:
     }
 
     // Create a header
-    ::std::array<uint8_t, kHeaderLength> hdr = { 0 };
+    ::std::array<uint8_t, kHeaderLength> hdr = {};
     hdr.at(16) = (frame_payload_len & 0xffff) >> 8;
     hdr.at(17) = (frame_payload_len & 0xff);
     hdr.at(18) = (frame_payload_len & 0xffff) >> 8;
@@ -291,9 +293,9 @@ bool Client::kdf_scramblesuit(const crypto::SecureBuffer& k_t) {
    * The actual counter component is initialized to 1.
    */
 
-  static constexpr ::std::array<uint8_t, 8> initial_ctr = {
+  static constexpr ::std::array<uint8_t, 8> initial_ctr = { {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
-  };
+  } };
 
   if (k_t.size() != 32)
     return false;

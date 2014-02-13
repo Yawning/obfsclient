@@ -309,7 +309,7 @@ out_free:
   } else if (can_none)
     auth_method_ = AuthMethod::kNONE_REQUIRED;
 
-  uint8_t method[2] = { kSocksVersion, auth_method_ };
+  uint8_t method[2] = { kSocksVersion, static_cast<uint8_t>(auth_method_) };
   if (0 != ::bufferevent_write(incoming_, method, sizeof(method)))
     goto out_free;
 
