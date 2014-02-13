@@ -144,15 +144,15 @@ class AesEcb {
   AesEcb(const AesEcb&) = delete;
   void operator=(const AesEcb&) = delete;
 
-  static const size_t kBlockLength = 16;  /**< AES block length */
+  static constexpr size_t kBlockLength = 16;  /**< AES block length */
 
   bool has_key_;        /**< Is the key valid? */
   EVP_CIPHER_CTX ctx_;  /**< The OpenSSL EVP context */
 };
 
-const size_t kAes128KeyLength = 16; /**< AES-128 key length */
-const size_t kAes192KeyLength = 24; /**< AES-192 key length */
-const size_t kAes256KeyLength = 32; /**< AES-256 key length */
+constexpr size_t kAes128KeyLength = 16; /**< AES-128 key length */
+constexpr size_t kAes192KeyLength = 24; /**< AES-192 key length */
+constexpr size_t kAes256KeyLength = 32; /**< AES-256 key length */
 
 /** AES-128-ECB */
 typedef AesEcb<::EVP_aes_128_ecb, kAes128KeyLength> Aes128Ecb;

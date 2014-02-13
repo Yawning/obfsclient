@@ -96,13 +96,13 @@ class Client : public Socks5Server::Session {
   void operator=(const Client&) = delete;
 
   /**< k_B length */
-  static const size_t kSharedSecretLength = 20;
+  static constexpr size_t kSharedSecretLength = 20;
   /**< HMAC-SHA256-128 digest length */
-  static const size_t kDigestLength = 16;
+  static constexpr size_t kDigestLength = 16;
   /** ScrambleSuit frame header length */
-  static const size_t kHeaderLength = 21;
+  static constexpr size_t kHeaderLength = 21;
   /** ScrambleSute frame max payload length */
-  static const size_t kMaxPayloadLength = 1427;
+  static constexpr size_t kMaxPayloadLength = 1427;
 
   /** ScrambleSuit Packet Flag bitfield */
   enum PacketFlags {

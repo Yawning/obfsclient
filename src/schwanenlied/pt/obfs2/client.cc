@@ -47,7 +47,7 @@ namespace pt {
 namespace obfs2 {
 
 void Client::on_outgoing_connected() {
-  const ::std::array<uint8_t, 29> init_mac_key = {
+  static constexpr ::std::array<uint8_t, 29> init_mac_key = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'i', 'o', 'n', ' ',
     'p', 'a', 'd', 'd', 'i', 'n', 'g'
@@ -146,8 +146,8 @@ void Client::on_outgoing_data_connecting() {
 
   // Read the resp_seed, magic value and padlen
   if (!received_seed_hdr_) {
-    const size_t seed_hdr_sz = kSeedLength + sizeof(uint32_t) * 2;
-    const ::std::array<uint8_t, 29> resp_mac_key = {
+    constexpr size_t seed_hdr_sz = kSeedLength + sizeof(uint32_t) * 2;
+    static constexpr ::std::array<uint8_t, 29> resp_mac_key = {
       'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
       'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'i', 'o', 'n', ' ',
       'p', 'a', 'd', 'd', 'i', 'n', 'g'
@@ -258,12 +258,12 @@ bool Client::mac(const uint8_t* key,
 }
 
 bool Client::kdf_obfs2() {
-  const ::std::array<uint8_t, 25> init_data = {
+  static constexpr ::std::array<uint8_t, 25> init_data = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'
   };
-  const ::std::array<uint8_t, 25> resp_data = {
+  static constexpr ::std::array<uint8_t, 25> resp_data = {
     'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'

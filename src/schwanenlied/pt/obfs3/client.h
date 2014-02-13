@@ -92,7 +92,7 @@ class Client : public Socks5Server::Session {
   Client(const Client&) = delete;
   void operator=(const Client&) = delete;
 
-  static const uint16_t kMaxPadding = 8194; /** obfs3 MAX_PADDING */
+  static constexpr uint16_t kMaxPadding = 8194; /** obfs3 MAX_PADDING */
 
   /** @{ */
   /**

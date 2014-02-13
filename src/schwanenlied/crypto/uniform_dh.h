@@ -54,7 +54,7 @@ namespace crypto {
 class UniformDH {
  public:
   /** The key length in bytes */
-  static const size_t kKeyLength = 1536 / 8;
+  static constexpr size_t kKeyLength = 1536 / 8;
 
   /**
    * Construct a UniformDH instance

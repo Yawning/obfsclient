@@ -54,9 +54,9 @@ using Obfs2Factory = schwanenlied::pt::obfs2::Client::SessionFactory;
 using Obfs3Factory = schwanenlied::pt::obfs3::Client::SessionFactory;
 using ScrambleSuitFactory = schwanenlied::pt::scramblesuit::Client::SessionFactory;
 
-static const char kObfs2MethodName[] = "obfs2";
-static const char kObfs3MethodName[] = "obfs3";
-static const char kScrambleSuitMethodName[] = "scramblesuit";
+static constexpr char kObfs2MethodName[] = "obfs2";
+static constexpr char kObfs3MethodName[] = "obfs3";
+static constexpr char kScrambleSuitMethodName[] = "scramblesuit";
 static struct event_base* ev_base = nullptr;
 
 static bool init_libevent() {

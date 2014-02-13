@@ -45,7 +45,7 @@ namespace crypto {
 class Sha256 {
  public:
   /** The digest length in bytes */
-  static const size_t kDigestLength = 32;
+  static constexpr size_t kDigestLength = 32;
 
   /** Construct a Sha256 instance */
   Sha256() {}

@@ -48,7 +48,7 @@ namespace crypto {
 class HmacSha256 {
  public:
   /** The digest length in bytes */
-  static const size_t kDigestLength = 32;
+  static constexpr size_t kDigestLength = 32;
 
   /**
    * Construct a HmacSha256 instance

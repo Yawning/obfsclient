@@ -179,22 +179,22 @@ out_error:
 }
 
 bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
-  const ::std::array<uint8_t, 25> init_data = {
+  static constexpr ::std::array<uint8_t, 25> init_data = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'
   };
-  const ::std::array<uint8_t, 25> resp_data = {
+  static constexpr ::std::array<uint8_t, 25> resp_data = {
     'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
     'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'e', 'd', ' ',
     'd', 'a', 't', 'a'
 
   };
-  const ::std::array<uint8_t, 15> init_magic = {
+  static constexpr ::std::array<uint8_t, 15> init_magic = {
     'I', 'n', 'i', 't', 'i', 'a', 't', 'o', 'r', ' ',
     'm', 'a', 'g', 'i', 'c'
   };
-  const ::std::array<uint8_t, 15> resp_magic = {
+  static constexpr ::std::array<uint8_t, 15> resp_magic = {
     'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
     'm', 'a', 'g', 'i', 'c'
   };

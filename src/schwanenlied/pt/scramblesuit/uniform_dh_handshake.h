@@ -52,7 +52,7 @@ class Client;
 class UniformDHHandshake {
  public:
   /** The length of the resultant shared secret */
-  static const size_t kSharedSecretLength = crypto::Sha256::kDigestLength;
+  static constexpr size_t kSharedSecretLength = crypto::Sha256::kDigestLength;
 
   /**
    * Construct a new UniformDHHandshake instance
@@ -107,13 +107,13 @@ class UniformDHHandshake {
   void operator=(const UniformDHHandshake&) = delete;
 
   /** The UniformDH public key length (X, Y) */
-  static const size_t kKeyLength = crypto::UniformDH::kKeyLength;
+  static constexpr size_t kKeyLength = crypto::UniformDH::kKeyLength;
   /** The HMAC-SHA-256 digest length (M_C, M_S, MAC) */
-  static const size_t kDigestLength = 16;
+  static constexpr size_t kDigestLength = 16;
   /** The maximum allowed padding length (P_C, P_S) */
-  static const size_t kMaxPadding = 1308;
+  static constexpr size_t kMaxPadding = 1308;
   /** The maximum allowed total handshake message length */
-  static const size_t kMaxMsgLength = kKeyLength + kMaxPadding +
+  static constexpr size_t kMaxMsgLength = kKeyLength + kMaxPadding +
       kDigestLength * 2;
 
   /** Generate pad length suitable for P_C */

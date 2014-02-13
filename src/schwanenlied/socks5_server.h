@@ -198,7 +198,7 @@ class Socks5Server {
     Session(const Session&) = delete;
     void operator=(const Session&) = delete;
 
-    static const uint8_t kSocksVersion = 0x05;
+    static constexpr uint8_t kSocksVersion = 0x05;
 
     /** The SOCKSv5 authentication methods */
     enum AuthMethod {
