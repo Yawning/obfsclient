@@ -54,7 +54,7 @@ out_error:
   }
 
   // Send the appropriate amount of random padding
-  auto padlen = gen_padlen();
+  const auto padlen = gen_padlen();
   if (padlen > 0) {
     uint8_t padding[kMaxPadding / 2];
     ::evutil_secure_rng_get_bytes(padding, padlen);
@@ -70,7 +70,7 @@ void Client::on_incoming_data() {
   
   if (!sent_magic_) {
     // Send random padding
-    auto padlen = gen_padlen();
+    const auto padlen = gen_padlen();
     if (padlen > 0) {
       uint8_t padding[kMaxPadding / 2];
       ::evutil_secure_rng_get_bytes(padding, padlen);
@@ -114,11 +114,11 @@ void Client::on_outgoing_data_connecting() {
   struct evbuffer* buf = ::bufferevent_get_input(outgoing_);
 
   // Read the peer's public key
-  size_t len = ::evbuffer_get_length(buf);
+  const size_t len = ::evbuffer_get_length(buf);
   if (len < crypto::UniformDH::kKeyLength)
     return;
 
-  uint8_t *p = ::evbuffer_pullup(buf, crypto::UniformDH::kKeyLength);
+  const uint8_t *p = ::evbuffer_pullup(buf, crypto::UniformDH::kKeyLength);
   if (p == nullptr) {
 out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
@@ -143,7 +143,7 @@ void Client::on_outgoing_data() {
 
   if (!received_magic_) {
     struct evbuffer* buf = ::bufferevent_get_input(outgoing_);
-    size_t len = ::evbuffer_get_length(buf);
+    const size_t len = ::evbuffer_get_length(buf);
     if (len < responder_magic_.size())
       return;
 

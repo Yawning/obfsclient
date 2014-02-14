@@ -64,7 +64,7 @@ bool Client::on_client_authenticate(const uint8_t* uname,
     ::std::memcpy(&args[ulen], passwd, plen);
 
   // One day I will write a CSV parser
-  size_t pos = args.find(passwd_prefix);
+  const size_t pos = args.find(passwd_prefix);
   if (pos != 0) {
 burn:
     crypto::memwipe(&args[0], args.size());
@@ -76,8 +76,8 @@ burn:
 
   const uint8_t* passwd_base32 = reinterpret_cast<const uint8_t*>(
       args.data() + passwd_prefix.length());
-  size_t len = crypto::Base32::decode(passwd_base32, passwd_len_base32,
-                                      shared_secret_);
+  const size_t len = crypto::Base32::decode(passwd_base32, passwd_len_base32,
+                                            shared_secret_);
   if (len != kSharedSecretLength)
     goto burn;
 
@@ -101,7 +101,7 @@ void Client::on_incoming_data() {
   size_t len = ::evbuffer_get_length(buf);
   while (len > 0) {
     // Chop up len into MSS sized ScrambleSuit frames
-    size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
+    const size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
     uint8_t* p = ::evbuffer_pullup(buf, frame_payload_len);
     if (p == nullptr) {
 out_error:
@@ -221,9 +221,8 @@ out_error:
       return;
 
     SL_ASSERT(decode_state_ == FrameDecodeState::kREAD_PAYLOAD);
-    int to_process = ::std::min(decode_total_len_ - (decode_buf_len_ - 
-                                                    kHeaderLength),
-                                len);
+    const int to_process = ::std::min(decode_total_len_ - (decode_buf_len_ - 
+                                                           kHeaderLength), len);
     SL_ASSERT(to_process + decode_buf_len_ <= decode_buf_.size());
 
     // Copy the data into the decode buffer

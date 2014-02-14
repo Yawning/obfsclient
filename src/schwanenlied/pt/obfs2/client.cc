@@ -84,7 +84,7 @@ out_error:
    */
 
   // Generate the encrypted data
-  const uint32_t padlen = gen_padlen();
+  const auto padlen = gen_padlen();
   ::std::array<uint32_t, 2> pad_hdr;
   constexpr size_t pad_hdr_sz = pad_hdr.size() * sizeof(uint32_t);
   pad_hdr.at(0) = htonl(kMagicValue);

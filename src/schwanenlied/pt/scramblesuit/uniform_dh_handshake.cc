@@ -86,7 +86,7 @@ bool UniformDHHandshake::send_handshake_msg(struct bufferevent* sink) {
 
   // Generate P_C
   ::std::array<uint8_t, kMaxPadding> p_c;
-  auto padlen = gen_padlen();
+  const auto padlen = gen_padlen();
   if (padlen > 0) {
     ::evutil_secure_rng_get_bytes(p_c.data(), padlen);
     if (!hmac_.update(p_c.data(), padlen))
@@ -144,14 +144,14 @@ bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
   
   if (remote_public_key_ == nullptr) {
     // Read Y
-    size_t len = ::evbuffer_get_length(buf);
+    const size_t len = ::evbuffer_get_length(buf);
     if (len < kKeyLength)
       return true;
 
     if (!hmac_.init())
       return false;
 
-    uint8_t* p = ::evbuffer_pullup(buf, kKeyLength);
+    const uint8_t* p = ::evbuffer_pullup(buf, kKeyLength);
     if (p == nullptr)
       return false;
 
@@ -175,7 +175,7 @@ bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
 
   if (remote_mac_ == nullptr) {
     // Attempt to find M_S
-    size_t len = ::evbuffer_get_length(buf);
+    const size_t len = ::evbuffer_get_length(buf);
     if (len < remote_mark_->size())
       return true;
 
@@ -190,7 +190,7 @@ bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
     if (found.pos > 0) {
       // HACKHACKHACKHACK
       const size_t to_mac = found.pos + remote_mark_->size();
-      uint8_t* p = ::evbuffer_pullup(buf, to_mac);
+      const uint8_t* p = ::evbuffer_pullup(buf, to_mac);
       if (p == nullptr)
         return false;
       if (!hmac_.update(p, to_mac))
@@ -216,7 +216,7 @@ bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
   SL_ASSERT(remote_mac_ != nullptr);
 
   // Extract M_S, and compare it to what was calculated
-  size_t len = ::evbuffer_get_length(buf);
+  const size_t len = ::evbuffer_get_length(buf);
   if (len < remote_mac_->size())
     return true;
 
