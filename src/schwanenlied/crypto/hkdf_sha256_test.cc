@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <array>
+
 #include "schwanenlied/crypto/hkdf_sha256.h"
 #include "gtest/gtest.h"
 

@@ -7917,15 +7917,11 @@ const DWORD kInvalidFileAttributes = 0xffffffff;
 const char kCurrentDirectoryString[] = ".\\";
 # endif  // GTEST_OS_WINDOWS_MOBILE
 #else
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
+// XXX/Yawning - None of these are used by obfsclient
+#if 0
 const char kPathSeparator = '/';
 const char kPathSeparatorString[] = "/";
 const char kCurrentDirectoryString[] = "./";
-#ifdef __clang__
-#pragma clang diagnostic pop
 #endif
 #endif  // GTEST_OS_WINDOWS
 
