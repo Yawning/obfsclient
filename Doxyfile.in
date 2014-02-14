@@ -733,14 +733,14 @@ WARN_LOGFILE           =
 # spaces.
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/../src/schwanenlied \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../src/schwanenlied/crypto \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../src/schwanenlied/pt \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../src/schwanenlied/pt/obfs2 \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../src/schwanenlied/pt/obfs3 \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../src/schwanenlied/pt/scramblesuit \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../src/main.cc \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../README.md
+INPUT                  = @top_srcdir@/src/schwanenlied \
+                         @top_srcdir@/src/schwanenlied/crypto \
+                         @top_srcdir@/src/schwanenlied/pt \
+                         @top_srcdir@/src/schwanenlied/pt/obfs2 \
+                         @top_srcdir@/src/schwanenlied/pt/obfs3 \
+                         @top_srcdir@/src/schwanenlied/pt/scramblesuit \
+                         @top_srcdir@/src/main.cc \
+                         @top_srcdir@/README.md
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -1005,7 +1005,7 @@ GENERATE_HTML          = YES
 # The default directory is: html.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-HTML_OUTPUT            = html
+HTML_OUTPUT            = @top_builddir@/docs/html
 
 # The HTML_FILE_EXTENSION tag can be used to specify the file extension for each
 # generated HTML page (for example: .htm, .php, .asp).

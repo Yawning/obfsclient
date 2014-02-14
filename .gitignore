@@ -3,6 +3,26 @@
 *.o
 *.a
 
-# Ignore the directory I stash my cmake build files in
-/build
+# Ignore automake/autoconf/doxygen generated files
+/Makefile
+/Makefile.in
+/aclocal.m4
+/autom4te.cache/
+/config.*
+/configure
+/compile
+/depcomp
+/install-sh
+/missing
+/stamp-h?
+/test-driver
+.deps/
+.dirstamp
 
+# Ignore binaries/test output/documentation if people do a in-tree build
+/obfsclient
+/obfsclient_test
+/Doxyfile
+/obfsclient_test.log
+/obfsclient_test.trs
+/test-suite.log

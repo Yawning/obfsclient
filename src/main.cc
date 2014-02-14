@@ -39,7 +39,7 @@
 #include <arpa/inet.h>
 #include <signal.h>
 
-#include <allium.h>
+#include <allium/allium.h>
 #include <event2/event.h>
 
 #include "schwanenlied/common.h"

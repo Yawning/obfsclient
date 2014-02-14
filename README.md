@@ -26,7 +26,6 @@ implementation.
 It currently has the following external dependencies:
 
  * Compile time only
-   * CMake (This can be changed out by an enterprising programmer)
    * Doxygen (For the documentation)
    * [Google C++ Testing Framework](https://code.google.com/p/googletest/)
      * A copy is included under src/gtest, so there should be no reason to
@@ -35,15 +34,11 @@ It currently has the following external dependencies:
  * [OpenSSL](https://www.openssl.org/)
  * [liballium](https://github.com/Yawning/liballium)
 
-My CMake-fu is weak so you will more than likely have to edit the CMakeLists.txt
-in the root directory for this to actually compile.  Apart from that it builds
-just like any other project.
-
 Make Targets:
 
- * all - Build the obfsclient binary and obfsclient_test
- * test - Run obfsclient_test (Better output if you run it manually)
- * doc - Build the doxygen documentation
+ * all - Build the obfsclient binary
+ * check - Build/Run obfsclient_test
+ * docs - Build the doxygen documentation
 
 ### Usage
 
@@ -79,7 +74,6 @@ Caveats:
  * Logging would be nice (Maybe?  It Just Works (TM)).
  * A connection timeout.
  * Implement the missing ScrambleSuit features.
- * The build system sucks.
 
 ### WON'T DO
 
