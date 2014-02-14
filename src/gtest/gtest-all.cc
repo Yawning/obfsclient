@@ -7917,12 +7917,9 @@ const DWORD kInvalidFileAttributes = 0xffffffff;
 const char kCurrentDirectoryString[] = ".\\";
 # endif  // GTEST_OS_WINDOWS_MOBILE
 #else
-// XXX/Yawning - None of these are used by obfsclient
-#if 0
 const char kPathSeparator = '/';
-const char kPathSeparatorString[] = "/";
+//const char kPathSeparatorString[] = "/";
 const char kCurrentDirectoryString[] = "./";
-#endif
 #endif  // GTEST_OS_WINDOWS
 
 // Returns whether the given character is a valid path separator.
