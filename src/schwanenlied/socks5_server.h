@@ -34,6 +34,8 @@
 #ifndef SCHWANENLIED_SOCKS5_SERVER_H__
 #define SCHWANENLIED_SOCKS5_SERVER_H__
 
+#include <netinet/in.h>
+
 #include <list>
 #include <memory>
 

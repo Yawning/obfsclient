@@ -34,6 +34,8 @@
 #ifndef SCHWANENLIED_PT_SCRAMBLESUIT_CLIENT_H__
 #define SCHWANENLIED_PT_SCRAMBLESUIT_CLIENT_H__
 
+#include <array>
+
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
 #include "schwanenlied/crypto/aes.h"
