@@ -84,15 +84,16 @@ out_error:
    */
 
   // Generate the encrypted data
-  uint32_t padlen = gen_padlen();
-  uint32_t pad_hdr[2] = { 0 };
-  pad_hdr[0] = htonl(kMagicValue);
-  pad_hdr[1] = htonl(padlen);
+  const uint32_t padlen = gen_padlen();
+  ::std::array<uint32_t, 2> pad_hdr;
+  constexpr size_t pad_hdr_sz = pad_hdr.size() * sizeof(uint32_t);
+  pad_hdr.at(0) = htonl(kMagicValue);
+  pad_hdr.at(1) = htonl(padlen);
 
   // Encrypt
-  if (!initiator_aes_.process(reinterpret_cast<uint8_t*>(pad_hdr),
-                              sizeof(pad_hdr),
-                              reinterpret_cast<uint8_t*>(pad_hdr)))
+  if (!initiator_aes_.process(reinterpret_cast<uint8_t*>(pad_hdr.data()),
+                              pad_hdr_sz,
+                              reinterpret_cast<uint8_t*>(pad_hdr.data())))
     goto out_error;
 
   // Send init_seed
@@ -100,7 +101,7 @@ out_error:
     goto out_error;
 
   // Send the header
-  if (0 != ::bufferevent_write(outgoing_, pad_hdr, sizeof(pad_hdr)))
+  if (0 != ::bufferevent_write(outgoing_, pad_hdr.data(), pad_hdr_sz))
     goto out_error;
 
   // Generate and send the random data
@@ -146,25 +147,22 @@ void Client::on_outgoing_data_connecting() {
 
   // Read the resp_seed, magic value and padlen
   if (!received_seed_hdr_) {
-    constexpr size_t seed_hdr_sz = kSeedLength + sizeof(uint32_t) * 2;
     static constexpr ::std::array<uint8_t, 29> resp_mac_key = { {
       'R', 'e', 's', 'p', 'o', 'n', 'd', 'e', 'r', ' ',
       'o', 'b', 'f', 'u', 's', 'c', 'a', 't', 'i', 'o', 'n', ' ',
       'p', 'a', 'd', 'd', 'i', 'n', 'g'
     } };
-    size_t len = ::evbuffer_get_length(buf);
-    if (len < seed_hdr_sz)
+    const size_t len = ::evbuffer_get_length(buf);
+    if (len < kSeedLength + sizeof(uint32_t) * 2)
       return;
 
-    uint8_t* p = ::evbuffer_pullup(buf, seed_hdr_sz);
-    if (p == nullptr) {
+    // Obtain RESP_SEED, and derive RESP_PAD_KEY
+    if (kSeedLength != ::evbuffer_remove(buf, &resp_seed_[0],
+                                         resp_seed_.size())) {
 out_error:
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
-
-    // Obtain RESP_SEED, and derive RESP_PAD_KEY
-    ::std::memcpy(&resp_seed_[0], p, resp_seed_.size());
     crypto::SecureBuffer resp_pad_key(crypto::Sha256::kDigestLength, 0);
     if (!mac(resp_mac_key.data(), resp_mac_key.size(), resp_seed_.data(),
            resp_seed_.size(), resp_pad_key))
@@ -176,17 +174,19 @@ out_error:
       goto out_error;
 
     // Validate the header and obtain padlen
-    uint32_t* pad_hdr = reinterpret_cast<uint32_t*>(p + kSeedLength);
-    if (!responder_aes_.process(reinterpret_cast<uint8_t*>(pad_hdr),
-                                sizeof(uint32_t) * 2,
-                                reinterpret_cast<uint8_t*>(pad_hdr)))
+    ::std::array<uint32_t, 2> pad_hdr;
+    constexpr size_t pad_hdr_sz = pad_hdr.size() * sizeof(uint32_t);
+    if (sizeof(uint32_t) * 2 != ::evbuffer_remove(buf, pad_hdr.data(), pad_hdr_sz))
+        goto out_error;
+    if (!responder_aes_.process(reinterpret_cast<uint8_t*>(pad_hdr.data()),
+                                pad_hdr_sz,
+                                reinterpret_cast<uint8_t*>(pad_hdr.data())))
       goto out_error;
-    if (ntohl(pad_hdr[0]) != kMagicValue)
+    if (ntohl(pad_hdr.at(0)) != kMagicValue)
       goto out_error;
-    resp_pad_len_ = ntohl(pad_hdr[1]);
+    resp_pad_len_ = ntohl(pad_hdr.at(1));
     if (resp_pad_len_ > kMaxPadding)
       goto out_error;
-    ::evbuffer_drain(buf, seed_hdr_sz);
 
     // Derive the actual keys
     if (!kdf_obfs2())
@@ -197,8 +197,8 @@ out_error:
 
   // Skip the responder padding
   if (resp_pad_len_ > 0) {
-    size_t len = ::evbuffer_get_length(buf);
-    size_t to_drain = ::std::min(resp_pad_len_, len);
+    const size_t len = ::evbuffer_get_length(buf);
+    const size_t to_drain = ::std::min(resp_pad_len_, len);
     ::evbuffer_drain(buf, to_drain);
     resp_pad_len_ -= to_drain;
     if (resp_pad_len_ > 0)
@@ -269,7 +269,7 @@ bool Client::kdf_obfs2() {
     'd', 'a', 't', 'a'
   } };
 
-  crypto::SecureBuffer to_mac = init_seed_ + resp_seed_;
+  const crypto::SecureBuffer to_mac = init_seed_ + resp_seed_;
   crypto::SecureBuffer sekrit(crypto::Sha256::kDigestLength, 0);
 
   /*
