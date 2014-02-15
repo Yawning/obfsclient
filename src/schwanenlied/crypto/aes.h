@@ -91,6 +91,7 @@ class AesEcb {
     if (1 != ::EVP_EncryptInit_ex(&ctx_, F(), nullptr,
                                   key.data(), nullptr))
       return false;
+    ::EVP_CIPHER_CTX_set_padding(&ctx_, 0);
 
     has_key_ = true;
 
