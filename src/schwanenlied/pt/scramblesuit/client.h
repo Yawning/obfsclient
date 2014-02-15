@@ -57,6 +57,7 @@ namespace scramblesuit {
 
 class Client : public Socks5Server::Session {
  public:
+  /** Client factory */
   class SessionFactory : public Socks5Server::SessionFactory {
    public:
     Socks5Server::Session* create_session(struct event_base* base,

@@ -162,7 +162,7 @@ class Ctr {
             break;
       }
 
-      *out++ = (*buf++)^ block_[offset_];
+      *out++ = (*buf++) ^ block_[offset_];
       offset_ = (offset_ + 1) % ecb_impl_.block_length();
     }
 
