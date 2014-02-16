@@ -71,7 +71,7 @@ static bool init_pt(const allium_ptcfg* cfg,
                     const char* name,
                     ::std::list<::std::unique_ptr<Socks5Factory>>& factories,
                     ::std::list<::std::unique_ptr<Socks5Server>>& listeners) {
-  if (::allium_ptcfg_method_requested(cfg, kObfs3MethodName) != 1)
+  if (::allium_ptcfg_method_requested(cfg, name) != 1)
     return false;
 
   if (!init_libevent()) {
