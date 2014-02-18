@@ -98,7 +98,7 @@ bool UniformDHHandshake::send_handshake_msg(struct bufferevent* sink) {
       return false;
 
   // Generate MAC
-  epoch_hour_ = ::std::to_string(::std::time(nullptr) / 3600);
+  epoch_hour_ = to_string(::std::time(nullptr) / 3600);
   if (!hmac_.update(reinterpret_cast<const uint8_t*>(epoch_hour_.data()),
                     epoch_hour_.size()))
     return false;

@@ -37,6 +37,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <string>
+#include <sstream>
 
 #define _ELPP_STOP_ON_FIRST_ASSERTION
 #define _ELPP_NO_DEFAULT_LOG_FILE
@@ -75,6 +77,22 @@ do {                                                                    \
   std::cerr << "  at: " << __FILE__ << ":" << __LINE__ << std::endl;    \
   std::terminate();                                                     \
 } while(0)
+
+/**
+ * std::to_string replacement
+ *
+ * Some versions of gcc/libstdc++ still in use (GCC 4.7.x in Debian/FreeBSD
+ * ports) are missing std::to_string
+ *
+ * @param[in] value  The value to convert to a string
+ *
+ * @returns The value converted to a string
+ */
+template <typename T> ::std::string to_string(const T& value) {
+  ::std::ostringstream stream;
+  stream << value;
+  return stream.str();
+}
 
 #ifdef DOXYGEN
 /*

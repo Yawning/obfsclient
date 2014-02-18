@@ -383,7 +383,7 @@ class Socks5Server {
                                     sizeof(str))) {
         ::std::string ret(str);
         ret += ":";
-        ret += ::std::to_string(ntohs(v4addr->sin_port));
+        ret += to_string(ntohs(v4addr->sin_port));
         return ret;
       }
     } else if (addr->sa_family == AF_INET6) {
@@ -394,7 +394,7 @@ class Socks5Server {
                                     sizeof(str))) {
         ::std::string ret(str);
         ret += ":";
-        ret += ::std::to_string(ntohs(v6addr->sin6_port));
+        ret += to_string(ntohs(v6addr->sin6_port));
         return ret;
       }
     }
