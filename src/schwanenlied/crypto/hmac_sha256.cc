@@ -50,9 +50,13 @@ bool HmacSha256::set_key(const SecureBuffer& key) {
 bool HmacSha256::init() {
   stream_state_ = State::kINVALID;
 
+#if OPENSSL_VERSION_NUMBER >= 0x10000000L
   if (1 != ::HMAC_Init_ex(&ctx_, key_.data(), key_.size(), ::EVP_sha256(),
                           nullptr))
     return false;
+#else
+  ::HMAC_Init_ex(&ctx_, key_.data(), key_.size(), ::EVP_sha256(), nullptr);
+#endif
 
   stream_state_ = State::kINIT;
 
@@ -70,8 +74,12 @@ bool HmacSha256::update(const uint8_t* buf,
   if (len == 0)
     return true;
 
+#if OPENSSL_VERSION_NUMBER >= 0x10000000L
   if (1 != ::HMAC_Update(&ctx_, buf, len))
     return false;
+#else
+  ::HMAC_Update(&ctx_, buf, len);
+#endif
 
   stream_state_ = State::kUPDATE;
 
@@ -95,14 +103,22 @@ bool HmacSha256::final(uint8_t* out,
 
   if (out_len == kDigestLength) {
     unsigned int digest_len = out_len;
+#if OPENSSL_VERSION_NUMBER >= 0x10000000L
     if (1 != ::HMAC_Final(&ctx_, out, &digest_len))
       return false;
+#else
+    ::HMAC_Final(&ctx_, out, &digest_len);
+#endif
     return (digest_len == out_len);
   } else {
     uint8_t digest[kDigestLength] = { 0 };
     unsigned int digest_len = kDigestLength;
+#if OPENSSL_VERSION_NUMBER >= 0x10000000L
     if (1 != ::HMAC_Final(&ctx_, digest, &digest_len))
       return false;
+#else
+    ::HMAC_Final(&ctx_, digest, &digest_len);
+#endif
     ::std::memcpy(out, digest, out_len);
     return (digest_len == kDigestLength);
   }
