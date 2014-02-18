@@ -110,8 +110,8 @@ static bool init_libevent() {
 template<class Factory>
 static bool init_pt(const allium_ptcfg* cfg,
                     const char* name,
-                    ::std::list<::std::unique_ptr<Socks5Factory>>& factories,
-                    ::std::list<::std::unique_ptr<Socks5Server>>& listeners,
+                    ::std::list< ::std::unique_ptr<Socks5Factory>>& factories,
+                    ::std::list< ::std::unique_ptr<Socks5Server>>& listeners,
                     const bool scrub_addrs = true) {
   if (::allium_ptcfg_method_requested(cfg, name) != 1)
     return false;
@@ -157,8 +157,8 @@ out_free:
 }
 
 int main(int argc, char* argv[]) {
-  ::std::list<::std::unique_ptr<Socks5Factory>> factories;
-  ::std::list<::std::unique_ptr<Socks5Server>> listeners;
+  ::std::list< ::std::unique_ptr<Socks5Factory>> factories;
+  ::std::list< ::std::unique_ptr<Socks5Server>> listeners;
   allium_ptcfg* cfg;
 
   cfg = ::allium_ptcfg_init();

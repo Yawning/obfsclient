@@ -156,11 +156,11 @@ constexpr size_t kAes192KeyLength = 24; /**< AES-192 key length */
 constexpr size_t kAes256KeyLength = 32; /**< AES-256 key length */
 
 /** AES-128-ECB */
-typedef AesEcb<::EVP_aes_128_ecb, kAes128KeyLength> Aes128Ecb;
+typedef AesEcb< ::EVP_aes_128_ecb, kAes128KeyLength> Aes128Ecb;
 /** AES-192-ECB */
-typedef AesEcb<::EVP_aes_192_ecb, kAes192KeyLength> Aes192Ecb;
+typedef AesEcb< ::EVP_aes_192_ecb, kAes192KeyLength> Aes192Ecb;
 /** AES-256-ECB */
-typedef AesEcb<::EVP_aes_256_ecb, kAes256KeyLength> Aes256Ecb;
+typedef AesEcb< ::EVP_aes_256_ecb, kAes256KeyLength> Aes256Ecb;
 
 /** AES-128-CTR */
 typedef Ctr<Aes128Ecb> Aes128Ctr;
