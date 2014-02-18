@@ -61,18 +61,19 @@ class Client : public Socks5Server::Session {
    public:
     Socks5Server::Session* create_session(struct event_base* base,
                                           const evutil_socket_t sock,
-                                          const struct sockaddr* addr,
-                                          const int addr_len) override {
+                                          const ::std::string& addr,
+                                          const bool scrub_addrs) override {
       return static_cast<Socks5Server::Session*>(new Client(base, sock, addr,
-                                                            addr_len));
+                                                            scrub_addrs));
     }
   };
 
   Client(struct event_base* base,
          const evutil_socket_t sock,
-         const struct sockaddr* addr,
-         const int addr_len) :
-      Session(base, sock, addr, addr_len, false),
+         const ::std::string& addr,
+         const bool scrub_addrs) :
+      Session(base, sock, addr, false, scrub_addrs),
+      logger_(::el::Loggers::getLogger(kLogger)),
       sent_magic_(false),
       received_magic_(false),
       initiator_magic_(crypto::HmacSha256::kDigestLength, 0),
@@ -93,6 +94,8 @@ class Client : public Socks5Server::Session {
   Client(const Client&) = delete;
   void operator=(const Client&) = delete;
 
+  static constexpr char kLogger[] = "obfs3";    /**< The obfs3 log id */
+
   static constexpr uint16_t kMaxPadding = 8194; /** obfs3 MAX_PADDING */
 
   /** @{ */
@@ -108,6 +111,10 @@ class Client : public Socks5Server::Session {
 
   /** Generate PADLEN (or PADLEN2) per the obfs3 spec */
   uint16_t gen_padlen() const;
+  /** @} */
+
+  /** @{ */
+  ::el::Logger* logger_;    /**< The obfs3 session logger_ */
   /** @} */
 
   /** @{ */

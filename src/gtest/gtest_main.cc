@@ -31,6 +31,12 @@
 
 #include "gtest/gtest.h"
 
+// XXX/Yawning - Initialize and disable easylogging++
+#define _ELPP_DISABLE_LOGS
+#define _ELPP_DISABLE_DEFAULT_CRASH_HANDLING
+#include "ext/easylogging++.h"
+_INITIALIZE_EASYLOGGINGPP
+
 GTEST_API_ int main(int argc, char **argv) {
   printf("Running main() from gtest_main.cc\n");
   testing::InitGoogleTest(&argc, argv);

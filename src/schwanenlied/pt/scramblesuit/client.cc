@@ -46,6 +46,7 @@ namespace schwanenlied {
 namespace pt {
 namespace scramblesuit {
 
+constexpr char Client::kLogger[];
 constexpr size_t Client::kMaxPayloadLength;
 
 bool Client::on_client_authenticate(const uint8_t* uname,
@@ -54,8 +55,11 @@ bool Client::on_client_authenticate(const uint8_t* uname,
                                     const uint8_t plen) {
   static const ::std::string passwd_prefix("password=");
   static constexpr size_t passwd_len_base32 = 32;
-  if ((uint16_t)ulen + plen == 0)
+  if ((uint16_t)ulen + plen == 0) {
+    CLOG(WARNING, kLogger) << "Expected a bridge password, got nothing "
+                           << "(" << this << ")";
     return false;
+  }
 
   ::std::string args((size_t)ulen + plen, 0);
   if (uname != nullptr)
@@ -66,20 +70,28 @@ bool Client::on_client_authenticate(const uint8_t* uname,
   // One day I will write a CSV parser
   const size_t pos = args.find(passwd_prefix);
   if (pos != 0) {
+    CLOG(WARNING, kLogger) << "Bridge password prefix missing, expected 'password=' "
+                           << "(" << this << ")";
 burn:
     crypto::memwipe(&args[0], args.size());
     return false;
   }
 
-  if (args.size() < passwd_prefix.length() + passwd_len_base32)
+  if (args.size() < passwd_prefix.length() + passwd_len_base32) {
+    CLOG(WARNING, kLogger) << "Bridge password under-sized, expected 32 bytes "
+                           << "(" << this << ")";
     goto burn;
+  }
 
   const uint8_t* passwd_base32 = reinterpret_cast<const uint8_t*>(
       args.data() + passwd_prefix.length());
   const size_t len = crypto::Base32::decode(passwd_base32, passwd_len_base32,
                                             shared_secret_);
-  if (len != kSharedSecretLength)
+  if (len != kSharedSecretLength) {
+    CLOG(WARNING, kLogger) << "Bridge password decode failure "
+                           << "(" << this << ")";
     goto burn;
+  }
 
   return true;
 }
@@ -89,8 +101,11 @@ void Client::on_outgoing_connected() {
   uniformdh_handshake_ = ::std::unique_ptr<UniformDHHandshake>(
       new UniformDHHandshake(shared_secret_));
   SL_ASSERT(uniformdh_handshake_ != nullptr);
-  if (!uniformdh_handshake_->send_handshake_msg(outgoing_))
+  if (!uniformdh_handshake_->send_handshake_msg(outgoing_)) {
+    CLOG(WARNING, kLogger) << "Initiator UniformDH handshake failed "
+                           << "(" << this << ")";
     send_socks5_response(Reply::kGENERAL_FAILURE);
+  }
 }
 
 void Client::on_incoming_data() {
@@ -104,6 +119,8 @@ void Client::on_incoming_data() {
     const size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
     uint8_t* p = ::evbuffer_pullup(buf, frame_payload_len);
     if (p == nullptr) {
+      CLOG(ERROR, kLogger) << "Failed to pullup buffer "
+                           << "(" << this << ")";
 out_error:
       delete this;
       return;
@@ -120,30 +137,58 @@ out_error:
     // Encrypt the header and payload
     if (!initiator_aes_.process(hdr.data() + kDigestLength,
                                 kHeaderLength - kDigestLength,
-                                hdr.data() + kDigestLength))
+                                hdr.data() + kDigestLength)) {
+      CLOG(ERROR, kLogger) << "Failed to encrypt frame header "
+                           << "(" << this << ")";
       goto out_error;
-    if (!initiator_aes_.process(p, frame_payload_len, p))
+    }
+    if (!initiator_aes_.process(p, frame_payload_len, p)) {
+      CLOG(ERROR, kLogger) << "Failed to encrypt frame payload "
+                           << "(" << this << ")";
       goto out_error;
+    }
 
     // MAC the frame
-    if (!initiator_hmac_.init())
+    if (!initiator_hmac_.init()) {
+      CLOG(ERROR, kLogger) << "Failed to init TX frame MAC "
+                           << "(" << this << ")";
       goto out_error;
+    }
     if (!initiator_hmac_.update(hdr.data() + kDigestLength, 
-                                kHeaderLength - kDigestLength))
+                                kHeaderLength - kDigestLength)) {
+      CLOG(ERROR, kLogger) << "Failed to MAC TX frame header "
+                           << "(" << this << ")";
       goto out_error;
-    if (!initiator_hmac_.update(p, frame_payload_len))
+    }
+    if (!initiator_hmac_.update(p, frame_payload_len)) {
+      CLOG(ERROR, kLogger) << "Failed to MAC TX frame payload "
+                           << "(" << this << ")";
       goto out_error;
-    if (!initiator_hmac_.final(hdr.data(), kDigestLength))
+    }
+    if (!initiator_hmac_.final(hdr.data(), kDigestLength)) {
+      CLOG(ERROR, kLogger) << "Failed to finalize TX frame MAC "
+                           << "(" << this << ")";
       goto out_error;
+    }
 
     // Send the frame
-    if (0 != ::bufferevent_write(outgoing_, hdr.data(), hdr.size()))
+    if (0 != ::bufferevent_write(outgoing_, hdr.data(), hdr.size())) {
+      CLOG(ERROR, kLogger) << "Failed to send frame header "
+                           << "(" << this << ")";
       goto out_error;
-    if (0 != ::bufferevent_write(outgoing_, p, frame_payload_len))
+    }
+    if (0 != ::bufferevent_write(outgoing_, p, frame_payload_len)) {
+      CLOG(ERROR, kLogger) << "Failed to send frame payload "
+                           << "(" << this << ")";
       goto out_error;
+    }
 
     // Remove the processed payload from the rx queue
     ::evbuffer_drain(buf, frame_payload_len);
+
+    CLOG(DEBUG, kLogger) << "Sent " 
+                         << hdr.size() << " + " << frame_payload_len << " bytes to peer "
+                         << "(" << this << ")";
 
     len -= frame_payload_len;
   }
@@ -155,14 +200,22 @@ void Client::on_outgoing_data_connecting() {
   // UniformDH handshake
   SL_ASSERT(uniformdh_handshake_ != nullptr);
   bool done = false;
-  if (!uniformdh_handshake_->recv_handshake_msg(outgoing_, done))
+  if (!uniformdh_handshake_->recv_handshake_msg(outgoing_, done)) {
+    CLOG(WARNING, kLogger) << "UniformDH handshake failed "
+                           << "(" << this << ")";
     send_socks5_response(Reply::kGENERAL_FAILURE);
-  else if (done) {
+  } else if (done) {
     // Ok, we have a shared secret now, derive the session keys
-    if (kdf_scramblesuit(uniformdh_handshake_->shared_secret()))
+    if (kdf_scramblesuit(uniformdh_handshake_->shared_secret())) {
+      CLOG(INFO, kLogger) << "Finished UniformDH handshake "
+                          << "(" << this << ": " << client_addr_str_ << " <-> "
+                                 << remote_addr_str_ << ")";
       send_socks5_response(Reply::kSUCCEDED);
-    else
+    } else {
+      CLOG(ERROR, kLogger) << "Failed to derive session keys "
+                           << "(" << this << ")";
       send_socks5_response(Reply::kGENERAL_FAILURE);
+    }
   }
 }
 
@@ -183,6 +236,8 @@ void Client::on_outgoing_data() {
       // Copy the header into the decode buffer
       if (kHeaderLength != ::evbuffer_remove(buf, decode_buf_.data(),
                                              kHeaderLength)) {
+        CLOG(ERROR, kLogger) << "Failed to read frame header "
+                             << "(" << this << ")";
 out_error:
         delete this;
         return;
@@ -191,27 +246,46 @@ out_error:
       len -= kHeaderLength;
 
       // MAC the header
-      if (!responder_hmac_.init())
+      if (!responder_hmac_.init()) {
+        CLOG(ERROR, kLogger) << "Failed to init RX frame MAC "
+                             << "(" << this << ")";
         goto out_error;
+      }
       if (!responder_hmac_.update(decode_buf_.data() + kDigestLength,
-                                  kHeaderLength - kDigestLength))
+                                  kHeaderLength - kDigestLength)) {
+        CLOG(ERROR, kLogger) << "Failed to MAC RX frame header "
+                             << "(" << this << ")";
         goto out_error;
+      }
 
       // Decrypt the header
       if (!responder_aes_.process(decode_buf_.data() + kDigestLength,
                                   kHeaderLength - kDigestLength,
-                                  decode_buf_.data() + kDigestLength))
+                                  decode_buf_.data() + kDigestLength)) {
+        CLOG(ERROR, kLogger) << "Failed to decrypt frame header "
+                             << "(" << this << ")";
         goto out_error;
+      }
 
       // Validate that the lengths are sane
       decode_total_len_ = (decode_buf_.at(16) << 8) | decode_buf_.at(17);
       decode_payload_len_ = (decode_buf_.at(18) << 8) | decode_buf_.at(19);
-      if (decode_total_len_ > kMaxPayloadLength)
+      if (decode_total_len_ > kMaxPayloadLength) {
+        CLOG(WARNING, kLogger) << "Total length oversized: " << decode_total_len_ << " "
+                               << "(" << this << ")";
         goto out_error;
-      if (decode_payload_len_ > kMaxPayloadLength)
+      }
+      if (decode_payload_len_ > kMaxPayloadLength) {
+        CLOG(WARNING, kLogger) << "Payload length oversized: " << decode_payload_len_ << " "
+                               << "(" << this << ")";
         goto out_error;
-      if (decode_total_len_ < decode_payload_len_)
+      }
+      if (decode_total_len_ < decode_payload_len_) {
+        CLOG(WARNING, kLogger) << "Payload longer than frame: "
+                               << decode_total_len_ << " < " << decode_payload_len_ << " "
+                               << "(" << this << ")";
         goto out_error;
+      }
 
       decode_state_ = FrameDecodeState::kREAD_PAYLOAD;
     }
@@ -227,42 +301,69 @@ out_error:
 
     // Copy the data into the decode buffer
     if (to_process != ::evbuffer_remove(buf, decode_buf_.data() +
-                                        decode_buf_len_, to_process))
+                                        decode_buf_len_, to_process)) {
+      CLOG(ERROR, kLogger) << "Failed to read frame payload "
+                           << "(" << this << ")";
       goto out_error;
+    }
 
     // MAC the encrypted payload
     if (!responder_hmac_.update(decode_buf_.data() + decode_buf_len_,
-                                to_process))
+                                to_process)) {
+      CLOG(ERROR, kLogger) << "Failed to MAC RX frame payload "
+                           << "(" << this << ")";
       goto out_error;
+    }
     decode_buf_len_ += to_process;
     len -= to_process;
 
     if (decode_buf_len_ == kHeaderLength + decode_total_len_) {
       // Validate the MAC
       ::std::array<uint8_t, kDigestLength> digest;
-      if (!responder_hmac_.final(digest.data(), digest.size()))
+      if (!responder_hmac_.final(digest.data(), digest.size())) {
+        CLOG(ERROR, kLogger) << "Failed to finalize RX frame MAC "
+                             << "(" << this << ")";
         goto out_error;
-      if (!crypto::memequals(decode_buf_.data(), digest.data(), digest.size()))
+      }
+      if (!crypto::memequals(decode_buf_.data(), digest.data(), digest.size())) {
+        CLOG(ERROR, kLogger) << "RX frame MAC mismatch "
+                             << "(" << this << ")";
         goto out_error;
+      }
 
       // Decrypt
       if (!responder_aes_.process(decode_buf_.data() + kHeaderLength,
                                   decode_buf_len_ - kHeaderLength,
-                                  decode_buf_.data() + kHeaderLength))
+                                  decode_buf_.data() + kHeaderLength)) {
+        CLOG(ERROR, kLogger) << "Failed to decrypt frame payload "
+                             << "(" << this << ")";
         goto out_error;
+      }
+
+      CLOG(DEBUG, kLogger) << "Received " << kHeaderLength << " + "
+                                          << decode_payload_len_ << " + "
+                                          << (decode_total_len_ - decode_payload_len_)
+                                          << " bytes from peer "
+                           << "(" << this << ")";
 
       if (decode_payload_len_ > 0) {
         // If the frame is payload, relay the payload
         switch (decode_buf_.at(20)) {
         case PacketFlags::kPAYLOAD:
           if (0 != ::bufferevent_write(incoming_, decode_buf_.data() +
-                                       kHeaderLength, decode_payload_len_))
+                                       kHeaderLength, decode_payload_len_)) {
+            CLOG(ERROR, kLogger) << "Failed to send remote payload "
+                                 << "(" << this << ")";
             goto out_error;
+          }
           break;
         case PacketFlags::kNEW_TICKET: // FALLSTHROUGH
         case PacketFlags::kPRNG_SEED: // FALLSTHROUGH
         default:
           // Just ignore unknown/unsupported frame types
+          CLOG(WARNING, kLogger) << "Received unsupported frame type: "
+                                 << static_cast<int>(decode_buf_.at(20)) << " "
+                                 << "(" << this << ")";
           break;
         }
       }

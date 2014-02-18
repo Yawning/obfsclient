@@ -41,13 +41,21 @@ namespace schwanenlied {
 namespace pt {
 namespace obfs3 {
 
+constexpr char Client::kLogger[];
+
 void Client::on_outgoing_connected() {
   SL_ASSERT(state_ == State::kCONNECTING);
+
+  CLOG(INFO, kLogger) << "Starting obfs3 handshake "
+                      << "(" << this << ": " << client_addr_str_ << " <-> "
+                             << remote_addr_str_ << ")";
 
   // Send the public key
   const auto public_key = uniform_dh_.public_key();
   if (0 != ::bufferevent_write(outgoing_, public_key.data(),
                                public_key.size())) {
+    CLOG(ERROR, kLogger) << "Failed to send public key "
+                         << "(" << this << ")";
 out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
@@ -59,9 +67,15 @@ out_error:
     uint8_t padding[kMaxPadding / 2];
     ::evutil_secure_rng_get_bytes(padding, padlen);
 
-    if (0 != ::bufferevent_write(outgoing_, padding, padlen))
+    if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
+      CLOG(ERROR, kLogger) << "Failed to send key padding "
+                           << "(" << this << ")";
       goto out_error;
+    }
   }
+
+  CLOG(DEBUG, kLogger) << "Initiator obfs3 handshake complete "
+                       << "(" << this << ")";
 }
 
 void Client::on_incoming_data() {
@@ -75,6 +89,8 @@ void Client::on_incoming_data() {
       uint8_t padding[kMaxPadding / 2];
       ::evutil_secure_rng_get_bytes(padding, padlen);
       if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
+        CLOG(ERROR, kLogger) << "Failed to send post-key padding "
+                             << "(" << this << ")";
         delete this;
         return;
       }
@@ -83,6 +99,8 @@ void Client::on_incoming_data() {
     // Send initiator_magic_
     if (0 != ::bufferevent_write(outgoing_, initiator_magic_.data(),
                                  initiator_magic_.size())) {
+      CLOG(ERROR, kLogger) << "Failed to send initiator magic "
+                           << "(" << this << ")";
       delete this;
       return;
     }
@@ -97,15 +115,26 @@ void Client::on_incoming_data() {
 
   uint8_t *p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
+    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
+                         << "(" << this << ")";
 out_error:
     delete this;
     return;
   }
-  if (!initiator_aes_.process(p, len, p))
+  if (!initiator_aes_.process(p, len, p)) {
+    CLOG(ERROR, kLogger) << "Failed to encrypt client payload "
+                         << "(" << this << ")";
     goto out_error;
-  if (::bufferevent_write(outgoing_, p, len) != 0)
+  }
+  if (::bufferevent_write(outgoing_, p, len) != 0) {
+    CLOG(ERROR, kLogger) << "Failed to send client payload "
+                         << "(" << this << ")";
     goto out_error;
+  }
   ::evbuffer_drain(buf, len);
+
+  CLOG(DEBUG, kLogger) << "Sent " << len << " bytes to peer "
+                       << "(" << this << ")";
 }
 
 void Client::on_outgoing_data_connecting() {
@@ -120,18 +149,29 @@ void Client::on_outgoing_data_connecting() {
 
   const uint8_t *p = ::evbuffer_pullup(buf, crypto::UniformDH::kKeyLength);
   if (p == nullptr) {
+    CLOG(ERROR, kLogger) << "Failed to pullup public key "
+                         << "(" << this << ")";
 out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
-  if (!uniform_dh_.compute_key(p, crypto::UniformDH::kKeyLength))
+  if (!uniform_dh_.compute_key(p, crypto::UniformDH::kKeyLength)) {
+    CLOG(WARNING, kLogger) << "UniformDH key exchange failed "
+                           << "(" << this << ")";
     goto out_error;
+  }
 
   // Apply the KDF and initialize the crypto
-  if (!kdf_obfs3(uniform_dh_.shared_secret()))
+  if (!kdf_obfs3(uniform_dh_.shared_secret())) {
+    CLOG(ERROR, kLogger) << "Failed to derive session keys "
+                         << "(" << this << ")";
     goto out_error;
-
+  }
   ::evbuffer_drain(buf, crypto::UniformDH::kKeyLength);
+
+  CLOG(INFO, kLogger) << "Finished obfs3 handshake "
+                      << "(" << this << ": " << client_addr_str_ << " <-> "
+                             << remote_addr_str_ << ")";
 
   // Handshaked
   send_socks5_response(Reply::kSUCCEDED);
@@ -152,6 +192,8 @@ void Client::on_outgoing_data() {
     if (found.pos == -1)
       return;
     if (found.pos > static_cast<ssize_t>(kMaxPadding + 1)) {
+      CLOG(WARNING, kLogger) << "Peer sent too much padding: " << found.pos << " "
+                             << "(" << this << ")";
       delete this;
       return;
     }
@@ -167,15 +209,26 @@ void Client::on_outgoing_data() {
 
   uint8_t *p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
+    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
+                         << "(" << this << ")";
 out_error:
     delete this;
     return;
   }
-  if (!responder_aes_.process(p, len, p))
+  if (!responder_aes_.process(p, len, p)) {
+    CLOG(ERROR, kLogger) << "Failed to decrypt remote payload "
+                         << "(" << this << ")";
     goto out_error;
-  if (::bufferevent_write(incoming_, p, len) != 0)
+  }
+  if (::bufferevent_write(incoming_, p, len) != 0) {
+    CLOG(ERROR, kLogger) << "Failed to send remote payload "
+                         << "(" << this << ")";
     goto out_error;
+  }
   ::evbuffer_drain(buf, len);
+
+  CLOG(DEBUG, kLogger) << "Received " << len << " bytes from peer "
+                       << "(" << this << ")";
 }
 
 bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {

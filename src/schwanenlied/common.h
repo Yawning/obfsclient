@@ -38,6 +38,12 @@
 #include <cstdint>
 #include <iostream>
 
+#define _ELPP_STOP_ON_FIRST_ASSERTION
+#define _ELPP_NO_DEFAULT_LOG_FILE
+#define _ELPP_DISABLE_VMODULES_EXTENSION
+#define _ELPP_DISABLE_DEFAULT_CRASH_HANDLING
+#include "ext/easylogging++.h"
+
 /**
  * An assert() replacement that will unconditionally be called
  *

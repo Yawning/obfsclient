@@ -59,18 +59,19 @@ class Client : public Socks5Server::Session {
   class SessionFactory : public Socks5Server::SessionFactory {
     Socks5Server::Session* create_session(struct event_base* base,
                                           const evutil_socket_t sock,
-                                          const struct sockaddr *addr,
-                                          const int addr_len) override {
+                                          const ::std::string& addr,
+                                          const bool scrub_addrs) override {
       return static_cast<Socks5Server::Session*>(new Client(base, sock, addr,
-                                                            addr_len));
+                                                            scrub_addrs));
     }
   };
 
   Client(struct event_base* base,
          const evutil_socket_t sock,
-         const struct sockaddr* addr,
-         const int addr_len) :
-      Session(base, sock, addr, addr_len),
+         const ::std::string& addr,
+         const bool scrub_addrs) :
+      Session(base, sock, addr, false, scrub_addrs),
+      logger_(::el::Loggers::getLogger(kLogger)),
       received_seed_hdr_(false),
       resp_pad_len_(0),
       init_seed_(kSeedLength, 0),
@@ -90,6 +91,8 @@ class Client : public Socks5Server::Session {
  private:
   Client(const Client&) = delete;
   void operator=(const Client&) = delete;
+
+  static constexpr char kLogger[] = "obfs2";  /**< The obfs2 log id */
 
   /** @{ */
   static constexpr uint32_t kMagicValue = 0x2BF5CA7E; /**< obfs2 MAGIC_VALUE */
@@ -128,6 +131,8 @@ class Client : public Socks5Server::Session {
   /** Generate PADLEN per the obfs2 spec */
   uint32_t gen_padlen() const;
   /** @} */
+
+  ::el::Logger* logger_;            /**< The obfs2 session logger */
 
   /** @{ */
   crypto::Aes128Ctr initiator_aes_; /**< Initiator->Responder E(K,s) */

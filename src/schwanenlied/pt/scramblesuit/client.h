@@ -62,18 +62,19 @@ class Client : public Socks5Server::Session {
    public:
     Socks5Server::Session* create_session(struct event_base* base,
                                           const evutil_socket_t sock,
-                                          const struct sockaddr* addr,
-                                          const int addr_len) override {
+                                          const ::std::string& addr,
+                                          const bool scrub_addrs) override {
       return static_cast<Socks5Server::Session*>(new Client(base, sock, addr,
-                                                            addr_len));
+                                                            scrub_addrs));
     }
   };
 
   Client(struct event_base* base,
-                      const evutil_socket_t sock,
-                      const struct sockaddr* addr,
-                      const int addr_len) :
-      Session(base, sock, addr, addr_len, true),
+         const evutil_socket_t sock,
+         const ::std::string& addr,
+         const bool scrub_addrs) :
+      Session(base, sock, addr, true, scrub_addrs),
+      logger_(::el::Loggers::getLogger(kLogger)),
       decode_state_(FrameDecodeState::kREAD_HEADER),
       decode_buf_len_(0) {}
 
@@ -99,14 +100,19 @@ class Client : public Socks5Server::Session {
   Client(const Client&) = delete;
   void operator=(const Client&) = delete;
 
-  /**< k_B length */
+  /** The scrablesuit log id */
+  static constexpr char kLogger[] = "scramblesuit";
+
+  /** @{ */
+  /** k_B length */
   static constexpr size_t kSharedSecretLength = 20;
-  /**< HMAC-SHA256-128 digest length */
+  /** HMAC-SHA256-128 digest length */
   static constexpr size_t kDigestLength = 16;
   /** ScrambleSuit frame header length */
   static constexpr size_t kHeaderLength = 21;
   /** ScrambleSute frame max payload length */
   static constexpr size_t kMaxPayloadLength = 1427;
+  /** @} */
 
   /** ScrambleSuit Packet Flag bitfield */
   enum PacketFlags {
@@ -124,6 +130,8 @@ class Client : public Socks5Server::Session {
    * @returns false - Failure
    */
   bool kdf_scramblesuit(const crypto::SecureBuffer& k_t);
+
+  ::el::Logger* logger_;  /**< The scramblesuit logger */
 
   /** @{ */
   /** The 160 bit bridge secret (k_B) */

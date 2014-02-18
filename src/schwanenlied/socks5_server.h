@@ -38,9 +38,11 @@
 
 #include <list>
 #include <memory>
+#include <string>
 
 #include <event2/bufferevent.h>
 #include <event2/listener.h>
+#include <event2/util.h>
 
 #include "schwanenlied/common.h"
 
@@ -87,15 +89,15 @@ class Socks5Server {
      * @param[in] base          The libevent2 event_base associated with the
      *                          Socks5Server
      * @param[in] sock          The Client to SOCKS server socket
-     * @param[in] addr          The address of the client
-     * @param[in] addr_len      The length of the sockaddr pointed to by addr
+     * @param[in] addr          The Client address/port
      * @param[in] require_auth  Authentication is required?
+     * @param[in] scrub_addrs   Scrub addresses in logs
      */
     Session(struct event_base* base,
             const evutil_socket_t sock,
-            const struct sockaddr* addr,
-            const int addr_len,
-            const bool require_auth = false);
+            const ::std::string& addr,
+            const bool require_auth = false,
+            const bool scrub_addrs = true);
 
     virtual ~Session();
 
@@ -173,13 +175,14 @@ class Socks5Server {
      */
     void send_socks5_response(const Reply reply);
 
+    /** @{ */
     /** The libevent2 event_base */
     struct event_base* base_;
     /** The Client to SOCKS Server bufferevent */
     struct bufferevent* incoming_;
     /** The SOCKS Server to Remote peer bufferevent */
     struct bufferevent* outgoing_;
-    /** The remote peer's address */
+    /** The remote peer address */
     struct sockaddr_storage remote_addr_;
     /** The length of remote_addr_ */
     socklen_t remote_addr_len_;
@@ -195,6 +198,14 @@ class Socks5Server {
       kFLUSHING_INCOMING, /**< outgoing_ closed, flushing incoming_ */
       kFLUSHING_OUTGOING, /**< incoming_ closed, flushing outgoing_ */
     } state_; /**< The SOCKSv5 session state */
+    /** @} */
+
+    /** @{ */
+    /** The string representation of the client address */
+    ::std::string client_addr_str_;
+    /** The string representation of the remote peer address */
+    ::std::string remote_addr_str_;
+    /** @} */
 
    private:
     Session(const Session&) = delete;
@@ -225,7 +236,8 @@ class Socks5Server {
       kIPv6 = 0x04        /**< IPv6 */
     };
 
-    bool auth_required_;  /**< Client must authenticate? */
+    const bool auth_required_;  /**< Client must authenticate? */
+    const bool scrub_addrs_;    /**< Should scrub addresses when logging? */
     AuthMethod auth_method_; /**< Negotiated auth method */
     bool incoming_valid_; /**< incoming_ connected? */
     bool outgoing_valid_; /**< outgoing_ connected? */
@@ -286,34 +298,39 @@ class Socks5Server {
     /**
      * Create a new Session instance
      *
-     * @param[in] base      The libevent2 event_base associated with the
-     *                      Socks5Server
-     * @param[in] sock      The Client to SOCKS server socket
-     * @param[in] addr      The address of the client
-     * @param[in] addr_len  The length of the sockaddr pointed to by addr
+     * @param[in] base        The libevent2 event_base associated with the
+     *                        Socks5Server
+     * @param[in] sock        The Client to SOCKS server socket
+     * @param[in] addr        The Client address/port
+     * @param[in] scrub_addrs Scrub addresses in logs
      *
      * @returns A pointer to a valid Session instance
      * @returns nullptr - Session initialization failed (caller will close sock)
      */
     virtual Session* create_session(struct event_base* base,
                                     const evutil_socket_t sock,
-                                    const struct sockaddr* addr,
-                                    const int addr_len) = 0;
+                                    const ::std::string& addr,
+                                    const bool scrub_addrs = true) = 0;
   };
 
   /**
    * Construct a Socks5Server
    *
-   * @param[in] factory   The SessionFactory to use when creating Session
-   *                      instances for client connections
-   * @param[in] base      The libevent2 event_base to use
+   * @param[in] factory     The SessionFactory to use when creating Session
+   *                        instances for client connections
+   * @param[in] base        The libevent2 event_base to use
+   * @param[in] scrub_addrs Scrub addresses in logs
    */
   Socks5Server(SessionFactory* factory,
-               struct event_base* base) :
+               struct event_base* base,
+               const bool scrub_addrs = true) :
       factory_(factory),
       base_(base),
+      scrub_addrs_(scrub_addrs),
+      logger_(::el::Loggers::getLogger(kLogger)),
       listener_(nullptr),
-      listener_addr_() {}
+      listener_addr_(),
+      listener_addr_str_() {}
 
   ~Socks5Server();
 
@@ -346,9 +363,50 @@ class Socks5Server {
   void close();
   /** @} */
 
+  /**
+   * Convert a sockaddr to a std::string
+   *
+   * @param[in] addr  The address to convert
+   * @param[in] scrub Scrub the address for privacy?
+   *
+   * @returns The address/port as a string
+   */
+  static ::std::string addr_to_string(const struct sockaddr* addr,
+                                      const bool scrub = true) {
+    if (scrub) return ::std::string("[Address Scrubbed]");
+
+    if (addr->sa_family == AF_INET) {
+      const struct sockaddr_in* v4addr = reinterpret_cast<const struct
+          sockaddr_in*>(addr);
+      char str[INET_ADDRSTRLEN];
+      if (str == ::evutil_inet_ntop(AF_INET, &v4addr->sin_addr, str,
+                                    sizeof(str))) {
+        ::std::string ret(str);
+        ret += ":";
+        ret += ::std::to_string(ntohs(v4addr->sin_port));
+        return ret;
+      }
+    } else if (addr->sa_family == AF_INET6) {
+      const struct sockaddr_in6* v6addr = reinterpret_cast<const struct
+          sockaddr_in6*>(addr);
+      char str[INET6_ADDRSTRLEN];
+      if (str == ::evutil_inet_ntop(AF_INET6, &v6addr->sin6_addr, str,
+                                    sizeof(str))) {
+        ::std::string ret(str);
+        ret += ":";
+        ret += ::std::to_string(ntohs(v6addr->sin6_port));
+        return ret;
+      }
+    }
+
+    return ::std::string("[Unknown Address]");
+  }
+
  private:
   Socks5Server(const Socks5Server&) = delete;
   void operator=(const Socks5Server&) = delete;
+
+  static constexpr char kLogger[] = "socks5"; /**< The SOCKS server log id */
 
   /** The SOCKS server libevent2 evconnlistener callback */
   void on_new_connection(evutil_socket_t sock,
@@ -357,8 +415,11 @@ class Socks5Server {
 
   SessionFactory* factory_;   /**< The factory used to create Sessions */
   struct event_base* base_;   /**< The libevent2 event_base */
+  const bool scrub_addrs_;    /**< Should scrub addresses when logging? */
+  ::el::Logger* logger_;      /**< The SOCKS server logger */
   struct evconnlistener* listener_;   /**< The SOCKS server socket */
   struct sockaddr_in listener_addr_;  /**< The SOCKS server socket address */
+  ::std::string listener_addr_str_;   /**< The SOCKS 5 server socket address */
 };
 
 } // namespace schwanenlied
