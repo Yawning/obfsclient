@@ -92,7 +92,7 @@ UniformDH::UniformDH() :
   SL_ASSERT(ctx_->p != nullptr);
   SL_ASSERT(ctx_->g != nullptr);
   SL_ASSERT(ctx_->priv_key != nullptr);
-  SL_ASSERT(::DH_size(ctx_) == kKeyLength);
+  SL_ASSERT(static_cast<size_t>(::DH_size(ctx_)) == kKeyLength);
 
   /*
    * To pick a private UniformDH key, we pick a random 1536-bit number,
@@ -122,7 +122,7 @@ UniformDH::UniformDH() :
   const int offset = public_key_.size() - BN_num_bytes(ctx_->pub_key);
   ret = ::BN_bn2bin(ctx_->pub_key, reinterpret_cast<unsigned
                     char*>(&public_key_[offset]));
-  SL_ASSERT(ret + offset == kKeyLength);
+  SL_ASSERT(ret + offset == static_cast<int>(kKeyLength));
 }
 
 UniformDH::~UniformDH() {

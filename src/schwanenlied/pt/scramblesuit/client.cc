@@ -234,8 +234,9 @@ void Client::on_outgoing_data() {
         return;
 
       // Copy the header into the decode buffer
-      if (kHeaderLength != ::evbuffer_remove(buf, decode_buf_.data(),
-                                             kHeaderLength)) {
+      if (static_cast<int>(kHeaderLength) != ::evbuffer_remove(buf,
+                                                               decode_buf_.data(),
+                                                               kHeaderLength)) {
         CLOG(ERROR, kLogger) << "Failed to read frame header "
                              << "(" << this << ")";
 out_error:

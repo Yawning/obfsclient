@@ -201,8 +201,8 @@ void Client::on_outgoing_data_connecting() {
       return;
 
     // Obtain RESP_SEED, and derive RESP_PAD_KEY
-    if (kSeedLength != ::evbuffer_remove(buf, &resp_seed_[0],
-                                         resp_seed_.size())) {
+    if (static_cast<int>(kSeedLength) != ::evbuffer_remove(buf, &resp_seed_[0],
+                                                           resp_seed_.size())) {
       CLOG(ERROR, kLogger) << "Failed to read RESP_SEED "
                            << "(" << this << ")";
 out_error:
