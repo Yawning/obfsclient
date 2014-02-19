@@ -1405,16 +1405,11 @@ class OS : base::StaticClass {
     /// @brief Whether or not terminal supports colors
     static inline bool termSupportsColor(void) {
         ELPP_RETURN_IF_RESOLVED(terminalSupportsColor);
-        // XXX/Yawning - Don't cache, see comment@1253
-#if 0
         std::string term = getEnvironmentVariable("TERM", "");
         ELPP_RESOLVED_VAL(terminalSupportsColor) = term == "xterm" || term == "xterm-color" || term == "xterm-256color" ||
                               term == "screen" || term == "linux" || term == "cygwin";
         ELPP_RESOLVED(terminalSupportsColor) = true;
         return ELPP_RESOLVED_VAL(terminalSupportsColor);
-#else
-        return false;
-#endif
     }
 };
 #undef ELPP_RESOLVED_VAL
