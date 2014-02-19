@@ -1250,6 +1250,9 @@ class Str : base::StaticClass {
         return buff;
     }
 };
+// XXX/Yawning - GCC 4.7 on FreeBSD ports doesn't call the ctor for the static
+// variables for some stupid reason, so just rip out the functionality for now.
+// obfsclient will NEVER use currentUser/currentHost anyway.
 #define ELPP_RESOLVED_VAL(var) s_##var
 #define ELPP_RESOLVED(var) s_##var##resolved
 #define ELPP_RESOLVED_VAR_DECLARE(type, var) static type ELPP_RESOLVED_VAL(var); static bool ELPP_RESOLVED(var)
@@ -1359,6 +1362,8 @@ class OS : base::StaticClass {
     /// @brief Gets current username.
     static inline const std::string currentUser(void) {
         ELPP_RETURN_IF_RESOLVED(currentUser);
+        // XXX/Yawning - Don't cache, see comment@1253
+#if 0
 #if _ELPP_OS_UNIX && !_ELPP_OS_ANDROID
         ELPP_RESOLVED_VAL(currentUser) = getEnvironmentVariable("USER", base::consts::kUnknownUser, "whoami");
 #elif _ELPP_OS_WINDOWS
@@ -1370,6 +1375,9 @@ class OS : base::StaticClass {
 #endif  // _ELPP_OS_UNIX && !_ELPP_OS_ANDROID
        ELPP_RESOLVED(currentUser) = true;
        return ELPP_RESOLVED_VAL(currentUser);
+#else
+       return std::string(base::consts::kUnknownUser);
+#endif
     }
 
     /// @brief Gets current host name or computer name.
@@ -1377,6 +1385,8 @@ class OS : base::StaticClass {
     /// @detail For android systems this is device name with its manufacturer and model seperated by hyphen
     static inline const std::string currentHost(void) {
        ELPP_RETURN_IF_RESOLVED(currentHost);
+       // XXX/Yawning - Don't cache, see comment@1253
+#if 0
 #if _ELPP_OS_UNIX && !_ELPP_OS_ANDROID
         ELPP_RESOLVED_VAL(currentHost) = getEnvironmentVariable("HOSTNAME", base::consts::kUnknownHost, "hostname");
 #elif _ELPP_OS_WINDOWS
@@ -1388,15 +1398,23 @@ class OS : base::StaticClass {
 #endif  // _ELPP_OS_UNIX && !_ELPP_OS_ANDROID
        ELPP_RESOLVED(currentHost) = true;
        return ELPP_RESOLVED_VAL(currentHost);
+#else
+       return std::string(base::consts::kUnknownHost);
+#endif
     }
     /// @brief Whether or not terminal supports colors
     static inline bool termSupportsColor(void) {
         ELPP_RETURN_IF_RESOLVED(terminalSupportsColor);
+        // XXX/Yawning - Don't cache, see comment@1253
+#if 0
         std::string term = getEnvironmentVariable("TERM", "");
         ELPP_RESOLVED_VAL(terminalSupportsColor) = term == "xterm" || term == "xterm-color" || term == "xterm-256color" ||
                               term == "screen" || term == "linux" || term == "cygwin";
         ELPP_RESOLVED(terminalSupportsColor) = true;
         return ELPP_RESOLVED_VAL(terminalSupportsColor);
+#else
+        return false;
+#endif
     }
 };
 #undef ELPP_RESOLVED_VAL
