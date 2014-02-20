@@ -1307,6 +1307,8 @@ class OS : base::StaticClass {
     /// @param command Bash command
     /// @return Result of bash output or empty string if no result found.
     static const std::string getBashOutput(const char* command) {
+        // XXX/Yawning - Holy shit, don't do this 
+#if 0
 #if (_ELPP_OS_UNIX && !_ELPP_OS_ANDROID && !_ELPP_CYGWIN)
         if (command == nullptr) {
             return std::string();
@@ -1329,6 +1331,10 @@ class OS : base::StaticClass {
         _ELPP_UNUSED(command);
         return std::string();
 #endif  // (_ELPP_OS_UNIX && !_ELPP_OS_ANDROID && !_ELPP_CYGWIN)
+#else
+        _ELPP_UNUSED(command);
+        return std::string();
+#endif
     }
 
     /// @brief Gets environment variable. This is cross-platform and CRT safe (for VC++)
@@ -1343,6 +1349,8 @@ class OS : base::StaticClass {
         const char* val = getWindowsEnvironmentVariable(variableName);
 #endif  // _ELPP_OS_UNIX
         if ((val == nullptr) || ((strcmp(val, "") == 0))) {
+          // XXX/Yawning - Holy shit, don't do this 
+#if 0
 #if _ELPP_OS_UNIX && defined(_ELPP_FORCE_ENV_VAR_FROM_BASH)
             // Try harder on unix-based systems
             std::string valBash = base::utils::OS::getBashOutput(alternativeBashCommand);
@@ -1355,6 +1363,10 @@ class OS : base::StaticClass {
             _ELPP_UNUSED(alternativeBashCommand);
             return std::string(defaultVal);
 #endif  // _ELPP_OS_UNIX && defined(_ELPP_FORCE_ENV_VAR_FROM_BASH)
+#else
+            _ELPP_UNUSED(alternativeBashCommand);
+            return std::string(defaultVal);
+#endif
         }
         return std::string(val);
     }
