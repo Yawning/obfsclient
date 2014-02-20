@@ -35,11 +35,14 @@
 #define SCHWANENLIED_PT_SCRAMBLESUIT_CLIENT_H__
 
 #include <array>
+#include <random>
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
+#include "schwanenlied/well512.h"
 #include "schwanenlied/crypto/aes.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
+#include "schwanenlied/pt/scramblesuit/prob_dist.h"
 #include "schwanenlied/pt/scramblesuit/uniform_dh_handshake.h"
 
 namespace schwanenlied {
@@ -51,7 +54,7 @@ namespace pt {
  * This implemets a wire compatible ScrambleSuit client using Socks5Server.
  *
  * @todo Support the Session Ticket handshake
- * @todo Support Protocol Polymorphism once it is documented
+ * @todo Support packet timing randomization
  */
 namespace scramblesuit {
 
@@ -76,7 +79,8 @@ class Client : public Socks5Server::Session {
       Session(base, sock, addr, true, scrub_addrs),
       logger_(::el::Loggers::getLogger(kLogger)),
       decode_state_(FrameDecodeState::kREAD_HEADER),
-      decode_buf_len_(0) {}
+      decode_buf_len_(0),
+      packet_len_rng_(kHeaderLength, kMaxFrameLength) {}
 
   ~Client() = default;
 
@@ -110,8 +114,12 @@ class Client : public Socks5Server::Session {
   static constexpr size_t kDigestLength = 16;
   /** ScrambleSuit frame header length */
   static constexpr size_t kHeaderLength = 21;
-  /** ScrambleSute frame max payload length */
-  static constexpr size_t kMaxPayloadLength = 1427;
+  /** ScrambleSuit PRNG seed length */
+  static constexpr size_t kPrngSeedLength = 32;
+  /** ScrambleSuit frame max frame length */
+  static constexpr size_t kMaxFrameLength = 1448;
+  /** ScrambleSuit frame max payload length */
+  static constexpr size_t kMaxPayloadLength = kMaxFrameLength - kHeaderLength;
   /** @} */
 
   /** ScrambleSuit Packet Flag bitfield */
@@ -130,6 +138,20 @@ class Client : public Socks5Server::Session {
    * @returns false - Failure
    */
   bool kdf_scramblesuit(const crypto::SecureBuffer& k_t);
+
+  /**
+   * Encode and send an outgoing ScrambleSuit frame
+   *
+   * @param[in] buf     The buffer to send as payload
+   * @param[in] len     The length of the payload
+   * @param[in] pad_len The length of the padding to append
+   *
+   * @returns true  - Success
+   * @returns false - Failure
+   */
+  bool send_outgoing_frame(const uint8_t* buf,
+                           const size_t len,
+                           const size_t pad_len);
 
   ::el::Logger* logger_;  /**< The scramblesuit logger */
 
@@ -161,6 +183,11 @@ class Client : public Socks5Server::Session {
   uint16_t decode_total_len_;
   /** The total payload in the frame being decoded */
   uint16_t decode_payload_len_;
+  /** @} */
+
+  /** @{ */
+  ProbDist packet_len_rng_; /**< Packet length morpher */
+  /** @} */
 };
 
 } // namespace scramblesuit

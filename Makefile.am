@@ -18,6 +18,7 @@ common_sources = src/schwanenlied/crypto/base32.cc \
 	src/schwanenlied/pt/obfs3/client.cc \
 	src/schwanenlied/pt/scramblesuit/client.cc \
 	src/schwanenlied/pt/scramblesuit/uniform_dh_handshake.cc \
+        src/schwanenlied/pt/scramblesuit/prob_dist.cc \
 	src/schwanenlied/socks5_server.cc
 
 # obfsclient
@@ -44,6 +45,7 @@ obfsclient_test_SOURCES = ${common_sources} \
 	src/schwanenlied/crypto/sha256_test.cc \
 	src/schwanenlied/crypto/uniform_dh_test.cc \
 	src/schwanenlied/crypto/utils_test.cc \
+        src/schwanenlied/well512_test.cc \
 	src/gtest/gtest-all.cc \
 	src/gtest/gtest_main.cc
 

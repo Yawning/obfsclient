@@ -47,6 +47,8 @@ namespace pt {
 namespace scramblesuit {
 
 constexpr char Client::kLogger[];
+constexpr size_t Client::kPrngSeedLength;
+constexpr size_t Client::kMaxFrameLength;
 constexpr size_t Client::kMaxPayloadLength;
 
 bool Client::on_client_authenticate(const uint8_t* uname,
@@ -97,6 +99,10 @@ burn:
 }
 
 void Client::on_outgoing_connected() {
+  // Dump the initial probability tables
+  CLOG(DEBUG, kLogger) << "Packet length probabilities: "
+                       << packet_len_rng_.to_string();
+
   // UniformDH handshake
   uniformdh_handshake_ = ::std::unique_ptr<UniformDHHandshake>(
       new UniformDHHandshake(shared_secret_));
@@ -114,6 +120,24 @@ void Client::on_incoming_data() {
 
   struct evbuffer* buf = ::bufferevent_get_input(incoming_);
   size_t len = ::evbuffer_get_length(buf);
+  if (len == 0)
+    return;
+
+  CLOG(DEBUG, kLogger) << "on_incoming_data(): Have " << len << " bytes";
+
+  // Calculate the padding to transform the burst
+  size_t pad_len = 0;
+  const size_t burst_tail_len = len % kMaxFrameLength;
+  const uint32_t sample_len = packet_len_rng_();
+  if (sample_len >= burst_tail_len)
+    pad_len = sample_len - burst_tail_len;
+  else
+    pad_len = (kMaxFrameLength - burst_tail_len) + sample_len;
+
+  CLOG(DEBUG, kLogger) << "Tail packet: " << burst_tail_len << " "
+                       << "Target: " << sample_len << " "
+                       << "Padding: " << pad_len;
+
   while (len > 0) {
     // Chop up len into MSS sized ScrambleSuit frames
     const size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
@@ -126,71 +150,38 @@ out_error:
       return;
     }
 
-    // Create a header
-    ::std::array<uint8_t, kHeaderLength> hdr = {};
-    hdr.at(16) = (frame_payload_len & 0xffff) >> 8;
-    hdr.at(17) = (frame_payload_len & 0xff);
-    hdr.at(18) = (frame_payload_len & 0xffff) >> 8;
-    hdr.at(19) = (frame_payload_len & 0xff);
-    hdr.at(20) = PacketFlags::kPAYLOAD;
-
-    // Encrypt the header and payload
-    if (!initiator_aes_.process(hdr.data() + kDigestLength,
-                                kHeaderLength - kDigestLength,
-                                hdr.data() + kDigestLength)) {
-      CLOG(ERROR, kLogger) << "Failed to encrypt frame header "
-                           << "(" << this << ")";
+    // Try to piggyback the padding on payload if we can get away with it
+    if (pad_len >= kHeaderLength && pad_len + frame_payload_len <= kMaxPayloadLength) {
+      // XXX: In theory, it's possible to incrementally send padding as well?
+      if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength))
+        goto out_error;
+      pad_len = 0;
+    } else if (!send_outgoing_frame(p, frame_payload_len, 0))
       goto out_error;
-    }
-    if (!initiator_aes_.process(p, frame_payload_len, p)) {
-      CLOG(ERROR, kLogger) << "Failed to encrypt frame payload "
-                           << "(" << this << ")";
-      goto out_error;
-    }
-
-    // MAC the frame
-    if (!initiator_hmac_.init()) {
-      CLOG(ERROR, kLogger) << "Failed to init TX frame MAC "
-                           << "(" << this << ")";
-      goto out_error;
-    }
-    if (!initiator_hmac_.update(hdr.data() + kDigestLength, 
-                                kHeaderLength - kDigestLength)) {
-      CLOG(ERROR, kLogger) << "Failed to MAC TX frame header "
-                           << "(" << this << ")";
-      goto out_error;
-    }
-    if (!initiator_hmac_.update(p, frame_payload_len)) {
-      CLOG(ERROR, kLogger) << "Failed to MAC TX frame payload "
-                           << "(" << this << ")";
-      goto out_error;
-    }
-    if (!initiator_hmac_.final(hdr.data(), kDigestLength)) {
-      CLOG(ERROR, kLogger) << "Failed to finalize TX frame MAC "
-                           << "(" << this << ")";
-      goto out_error;
-    }
-
-    // Send the frame
-    if (0 != ::bufferevent_write(outgoing_, hdr.data(), hdr.size())) {
-      CLOG(ERROR, kLogger) << "Failed to send frame header "
-                           << "(" << this << ")";
-      goto out_error;
-    }
-    if (0 != ::bufferevent_write(outgoing_, p, frame_payload_len)) {
-      CLOG(ERROR, kLogger) << "Failed to send frame payload "
-                           << "(" << this << ")";
-      goto out_error;
-    }
 
     // Remove the processed payload from the rx queue
     ::evbuffer_drain(buf, frame_payload_len);
 
-    CLOG(DEBUG, kLogger) << "Sent " 
-                         << hdr.size() << " + " << frame_payload_len << " bytes to peer "
-                         << "(" << this << ")";
-
     len -= frame_payload_len;
+  }
+
+  // Welp, was not able to piggyback the padding, need to send empty frames
+  if (pad_len > 0) {
+    if (pad_len > kHeaderLength) {
+      if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength)) {
+        delete this;
+        return;
+      }
+    } else {
+      if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength)) {
+        delete this;
+        return;
+      }
+      if (!send_outgoing_frame(nullptr, 0, pad_len)) {
+        delete this;
+        return;
+      }
+    }
   }
 }
 
@@ -358,8 +349,19 @@ out_error:
             goto out_error;
           }
           break;
+        case PacketFlags::kPRNG_SEED:
+          if (decode_payload_len_ != kPrngSeedLength) {
+            CLOG(WARNING, kLogger) << "Received invalid PRNG seed, ignoring";
+            break;
+          }
+          CLOG(INFO, kLogger) << "Received new PRNG seed, morphing";
+          packet_len_rng_.reset(decode_buf_.data() + kHeaderLength,
+                                decode_payload_len_, kHeaderLength,
+                                kMaxFrameLength);
+          CLOG(DEBUG, kLogger) << "Packet length probabilities: "
+                               << packet_len_rng_.to_string();
+          break;
         case PacketFlags::kNEW_TICKET: // FALLSTHROUGH
-        case PacketFlags::kPRNG_SEED: // FALLSTHROUGH
         default:
           // Just ignore unknown/unsupported frame types
           CLOG(WARNING, kLogger) << "Received unsupported frame type: "
@@ -418,6 +420,99 @@ bool Client::kdf_scramblesuit(const crypto::SecureBuffer& k_t) {
     return false;
   if (!responder_hmac_.set_key(prk.substr(112, 32)))
     return false;
+
+  return true;
+}
+
+bool Client::send_outgoing_frame(const uint8_t* buf,
+                                 const size_t len,
+                                 const size_t pad_len) {
+  if (len == 0 && buf != nullptr)
+    return false;
+  if (buf == nullptr && len != 0)
+    return false;
+  if (len + pad_len + kHeaderLength > kMaxFrameLength)
+    return false;
+  if (len > kMaxPayloadLength)
+    return false;
+  if (pad_len > kMaxPayloadLength)
+    return false;
+
+  // Create a header
+  const size_t frame_payload_len = len + pad_len;
+  ::std::array<uint8_t, kHeaderLength> hdr = {};
+  hdr.at(16) = (frame_payload_len & 0xffff) >> 8;
+  hdr.at(17) = (frame_payload_len & 0xff);
+  hdr.at(18) = (len & 0xffff) >> 8;
+  hdr.at(19) = (len & 0xff);
+  hdr.at(20) = PacketFlags::kPAYLOAD;
+
+  // Encrypt the header
+  if (!initiator_aes_.process(hdr.data() + kDigestLength,
+                              kHeaderLength - kDigestLength,
+                              hdr.data() + kDigestLength)) {
+    CLOG(ERROR, kLogger) << "Failed to encrypt frame header "
+                         << "(" << this << ")";
+    return false;
+  }
+
+  // Generate the payload/padding
+  ::std::array<uint8_t, kMaxPayloadLength> payload = {};
+  SL_ASSERT(payload.size() >= frame_payload_len);
+  if (len > 0) {
+    if (!initiator_aes_.process(buf, len, payload.data())) {
+      CLOG(ERROR, kLogger) << "Failed to encrypt frame payload "
+                           << "(" << this << ")";
+      return false;
+    }
+  }
+  if (pad_len > 0) {
+    if (!initiator_aes_.process(payload.data() + len, pad_len, payload.data() +
+                                len)) {
+      CLOG(ERROR, kLogger) << "Failed to encrypt frame padding "
+                           << "(" << this << ")";
+      return false;
+    }
+  }
+
+  // MAC the frame
+  if (!initiator_hmac_.init()) {
+    CLOG(ERROR, kLogger) << "Failed to init TX frame MAC "
+                         << "(" << this << ")";
+    return false;
+  }
+  if (!initiator_hmac_.update(hdr.data() + kDigestLength,
+                              kHeaderLength - kDigestLength)) {
+    CLOG(ERROR, kLogger) << "Failed to MAC TX frame header "
+                         << "(" << this << ")";
+    return false;
+  }
+  if (!initiator_hmac_.update(payload.data(), frame_payload_len)) {
+    CLOG(ERROR, kLogger) << "Failed to MAC TX frame payload "
+                         << "(" << this << ")";
+    return false;
+  }
+  if (!initiator_hmac_.final(hdr.data(), kDigestLength)) {
+    CLOG(ERROR, kLogger) << "Failed to finalize TX frame MAC "
+                         << "(" << this << ")";
+    return false;
+  }
+
+  // Send the frame
+  if (0 != ::bufferevent_write(outgoing_, hdr.data(), hdr.size())) {
+    CLOG(ERROR, kLogger) << "Failed to send frame header "
+                         << "(" << this << ")";
+    return false;
+  }
+  if (0 != ::bufferevent_write(outgoing_, payload.data(), frame_payload_len)) {
+    CLOG(ERROR, kLogger) << "Failed to send frame payload "
+                         << "(" << this << ")";
+    return false;
+  }
+
+  CLOG(DEBUG, kLogger) << "Sent " << hdr.size() << " + " << len << " + "
+                       << pad_len << " bytes to peer "
+                       << "(" << this << ")";
 
   return true;
 }

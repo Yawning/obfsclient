@@ -14,7 +14,7 @@ This is a C++11 client implementation of the following protocols:
  * [ScrambleSuit](https://github.com/NullHypothesis/scramblesuit/blob/master/doc/scramblesuit-spec.txt) - *EXPERIMENTAL*
    * This requires tor-0.2.5.x or later for Pluggable Transport arguments.
    * The Session Ticket Handshake is not implemented yet.
-   * Protocol Polymorphism is not implemented yet.
+   * Inter-Arrival Time obfuscation is not implemented yet.
 
 By design will only function as a ClientTransportPlugin for Tor.  It does use a
 reasonably complete implementation of the Pluggable Transport spec so when used
