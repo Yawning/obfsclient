@@ -343,6 +343,10 @@ bool Client::on_outgoing_flush() {
    * incoming_'s read buffer is drained, the timer won't be pending, so it's
    * safe to flush things.
    */
+
+  if (iat_timer_ev_ == nullptr)
+    return true;
+
   return !evtimer_pending(iat_timer_ev_, NULL);
 }
 
