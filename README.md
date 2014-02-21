@@ -27,12 +27,10 @@ It currently has the following external dependencies:
 
  * Compile time only
    * Doxygen (For the documentation)
+ * Bundled under src/ext (No need to install)
    * [Google C++ Testing Framework](https://code.google.com/p/googletest/)
-     * A copy is included under src/gtest, so there should be no reason to
-       install this.
    * [easylogging++](https://github.com/easylogging/easyloggingpp)
-     * A copy is included under src/ext, so there should be no reason to install
-       this.
+   * [The Lean Mean C++ Option Parser](http://optionparser.sourceforge.net/)
  * [libevent2](https://www.libevent.org)
  * [OpenSSL](https://www.openssl.org/)
  * [liballium](https://github.com/Yawning/liballium)

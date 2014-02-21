@@ -43,6 +43,7 @@
 #include <allium/allium.h>
 #include <event2/event.h>
 
+#include "ext/optionparser.h"
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
 #include "schwanenlied/pt/obfs2/client.h"
@@ -51,23 +52,44 @@
 
 _INITIALIZE_EASYLOGGINGPP
 
+namespace {
+
+enum kOptionIndex {
+  kUNKNOWN,
+  kHELP,
+  kDEBUG,
+  kUNSAFE_LOGS
+};
+
+const ::option::Descriptor kUsage[] = {
+  { kUNKNOWN, 0, "", "", ::option::Arg::None,
+    "usage: obfsclient [OPTION]" },
+  { kHELP, 0, "", "help", ::option::Arg::Optional,
+    "  --help         Print usage." },
+  { kDEBUG, 0, "", "debug", ::option::Arg::Optional,
+    "  --debug        Enable debugging." },
+  { kUNSAFE_LOGS, 0, "", "unsafe-logs", ::option::Arg::Optional,
+    "  --unsafe-logs  Unsafe logging." },
+  { 0, 0, nullptr, nullptr, 0, nullptr }
+};
+
 using Socks5Server = schwanenlied::Socks5Server;
 using Socks5Factory = schwanenlied::Socks5Server::SessionFactory;
 using Obfs2Factory = schwanenlied::pt::obfs2::Client::SessionFactory;
 using Obfs3Factory = schwanenlied::pt::obfs3::Client::SessionFactory;
 using ScrambleSuitFactory = schwanenlied::pt::scramblesuit::Client::SessionFactory;
 
-static constexpr char kLogFileName[] = "obfsclient.log";
-static constexpr char kLogger[] = "main";
+constexpr char kLogFileName[] = "obfsclient.log";
+constexpr char kLogger[] = "main";
 
-static constexpr char kObfs2MethodName[] = "obfs2";
-static constexpr char kObfs3MethodName[] = "obfs3";
-static constexpr char kScrambleSuitMethodName[] = "scramblesuit";
+constexpr char kObfs2MethodName[] = "obfs2";
+constexpr char kObfs3MethodName[] = "obfs3";
+constexpr char kScrambleSuitMethodName[] = "scramblesuit";
 
-static struct event_base* ev_base = nullptr;
+struct event_base* ev_base = nullptr;
 
-static bool init_statedir(const allium_ptcfg* cfg,
-                          ::std::string& path) {
+bool init_statedir(const allium_ptcfg* cfg,
+                   ::std::string& path) {
   size_t len = 0;
   ::allium_ptcfg_state_dir(cfg, nullptr, &len);
   ::std::unique_ptr<char> tmp(new char[len]);
@@ -78,9 +100,9 @@ static bool init_statedir(const allium_ptcfg* cfg,
   return true;
 }
 
-static void init_logging(const bool enabled,
-                         const ::std::string& path,
-                         const bool debug) {
+void init_logging(const bool enabled,
+                  const ::std::string& path,
+                  const bool debug) {
   ::el::Configurations conf;
   conf.setToDefault();
   if (enabled) {
@@ -100,7 +122,7 @@ static void init_logging(const bool enabled,
   (void)::el::Loggers::getLogger(kLogger);
 }
 
-static bool init_libevent() {
+bool init_libevent() {
   if (ev_base == nullptr)
     ev_base = ::event_base_new();
 
@@ -108,7 +130,7 @@ static bool init_libevent() {
 }
 
 template<class Factory>
-static bool init_pt(const allium_ptcfg* cfg,
+bool init_pt(const allium_ptcfg* cfg,
                     const char* name,
                     ::std::list< ::std::unique_ptr<Socks5Factory>>& factories,
                     ::std::list< ::std::unique_ptr<Socks5Server>>& listeners,
@@ -156,12 +178,31 @@ out_free:
   return true;
 }
 
-int main(int argc, char* argv[]) {
-  ::std::list< ::std::unique_ptr<Socks5Factory>> factories;
-  ::std::list< ::std::unique_ptr<Socks5Server>> listeners;
-  allium_ptcfg* cfg;
+} // (Annonymous) namespace
 
-  cfg = ::allium_ptcfg_init();
+int main(int argc, char* argv[]) {
+  // Parse the commnad line arguments
+  if (argc > 0) {
+    argc--;
+    argv++;
+  }
+  ::option::Stats  stats(kUsage, argc, argv);
+  ::option::Option* options = new ::option::Option[stats.options_max];
+  ::option::Option* buffer = new ::option::Option[stats.buffer_max];
+  ::option::Parser parse(kUsage, argc, argv, options, buffer);
+  if (parse.error())
+    return 1;
+  if (options[kHELP] || options[kUNKNOWN]) {
+    ::option::printUsage(std::cout, kUsage);
+    return 0;
+  }
+  const bool debug = options[kDEBUG];
+  const bool scrub_ips = !options[kUNSAFE_LOGS];
+  delete[] options;
+  delete[] buffer;
+
+  // Start the PT configuration
+  allium_ptcfg* cfg = ::allium_ptcfg_init();
   if (!cfg)
     return -1;
 
@@ -174,19 +215,22 @@ int main(int argc, char* argv[]) {
   // Determine the state directory and initialize logging
   ::std::string state_dir;
   const bool has_state_dir = init_statedir(cfg, state_dir);
-  init_logging(has_state_dir, state_dir, false); // No debug logs for now
+  init_logging(has_state_dir, state_dir, debug);
 
   // Log a banner
   CLOG(INFO, kLogger) << "obfsclient - Initialized (PID: " << ::getpid() << ")";
 
   // Attempt to initialize the supported PTs
+  ::std::list< ::std::unique_ptr<Socks5Factory>> factories;
+  ::std::list< ::std::unique_ptr<Socks5Server>> listeners;
   bool dispatch_loop = false;
   dispatch_loop |= init_pt<Obfs3Factory>(cfg, kObfs3MethodName, factories,
-                                         listeners);
+                                         listeners, scrub_ips);
   dispatch_loop |= init_pt<Obfs2Factory>(cfg, kObfs2MethodName, factories,
-                                         listeners);
+                                         listeners, scrub_ips);
   dispatch_loop |= init_pt<ScrambleSuitFactory>(cfg, kScrambleSuitMethodName,
-                                                factories, listeners);
+                                                factories, listeners,
+                                                scrub_ips);
 
   // Done with the config!
   ::allium_ptcfg_methods_done(cfg);
