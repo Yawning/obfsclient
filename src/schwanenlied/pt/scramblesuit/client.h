@@ -35,11 +35,9 @@
 #define SCHWANENLIED_PT_SCRAMBLESUIT_CLIENT_H__
 
 #include <array>
-#include <random>
 
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
-#include "schwanenlied/well512.h"
 #include "schwanenlied/crypto/aes.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
 #include "schwanenlied/pt/scramblesuit/prob_dist.h"

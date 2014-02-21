@@ -51,7 +51,7 @@ TEST_F(Well512Test, SmokeTest) {
     counts.at(sample - 1)++;
   }
   ::std::cout << "  1000d6 results: ";
-  for (auto i = 0; i < counts.size(); i++) {
+  for (size_t i = 0; i < counts.size(); i++) {
     ::std::cout << (i + 1) << ": " << counts.at(i) << " ";
   }
   ::std::cout << ::std::endl;

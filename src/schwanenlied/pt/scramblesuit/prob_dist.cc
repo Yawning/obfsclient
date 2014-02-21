@@ -67,8 +67,8 @@ void ProbDist::reset(const uint8_t* seed,
 
   // Generate weights
   ::std::vector<int> weights(values_.size());
-  for (size_t i = 0; i < values_.size(); i++)
-    weights.at(i) = weight_dist_(rng_);
+  for (int& val : weights)
+    val = weight_dist_(rng_);
 
   // Setup the disctete distribution
   typedef ::std::discrete_distribution<>::param_type param_type;
