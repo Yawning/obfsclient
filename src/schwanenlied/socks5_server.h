@@ -156,6 +156,17 @@ class Socks5Server {
 
     /** SOCKS Server to Remote peer write queue empty callback */
     virtual void on_outgoing_drained() {}
+
+    /**
+     * SOCKS Server to Remote peer flush callback (State::kFLUSHING_OUTGOING)
+     *
+     * Called when flushing the outgoing_ buffer pending final teardown.
+     *
+     * @returns true  - The buffer is fully flushed (or something horrible
+     *                  happened) and the Session can be removed
+     * @returns false - Keep flushing at a later time
+     */
+    virtual bool on_outgoing_flush() { return true; }
     /** @} */
 
     /**

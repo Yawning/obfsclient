@@ -36,6 +36,8 @@
 
 #include <array>
 
+#include <event2/event.h>
+
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
 #include "schwanenlied/crypto/aes.h"
@@ -49,10 +51,9 @@ namespace pt {
 /**
  * ScrambleSuit
  *
- * This implemets a wire compatible ScrambleSuit client using Socks5Server.
+ * This implements a wire compatible ScrambleSuit client using Socks5Server.
  *
  * @todo Support the Session Ticket handshake
- * @todo Support packet timing randomization
  */
 namespace scramblesuit {
 
@@ -78,9 +79,14 @@ class Client : public Socks5Server::Session {
       logger_(::el::Loggers::getLogger(kLogger)),
       decode_state_(FrameDecodeState::kREAD_HEADER),
       decode_buf_len_(0),
-      packet_len_rng_(kHeaderLength, kMaxFrameLength) {}
+      packet_len_rng_(kHeaderLength, kMaxFrameLength),
+      packet_int_rng_(0, kMaxPacketDelay),
+      iat_timer_ev_(nullptr) {}
 
-  ~Client() = default;
+  ~Client() {
+    if (iat_timer_ev_ != nullptr)
+      ::event_free(iat_timer_ev_);
+  }
 
  protected:
   bool on_client_authenticate(const uint8_t* uname,
@@ -96,7 +102,7 @@ class Client : public Socks5Server::Session {
 
   void on_outgoing_data() override;
 
-  void on_outgoing_drained() override;
+  bool on_outgoing_flush() override;
 
  private:
   Client(const Client&) = delete;
@@ -118,6 +124,8 @@ class Client : public Socks5Server::Session {
   static constexpr size_t kMaxFrameLength = 1448;
   /** ScrambleSuit frame max payload length */
   static constexpr size_t kMaxPayloadLength = kMaxFrameLength - kHeaderLength;
+  /** ScrambleSuit max IAT obfsucation delay (multiples of 100 usec) */
+  static constexpr uint32_t kMaxPacketDelay = 100;
   /** @} */
 
   /** ScrambleSuit Packet Flag bitfield */
@@ -136,6 +144,19 @@ class Client : public Socks5Server::Session {
    * @returns false - Failure
    */
   bool kdf_scramblesuit(const crypto::SecureBuffer& k_t);
+
+  /**
+   * Schedule the Inter-Arrival Time obfuscation TX timer
+   *
+   * @returns true  - Success
+   * @returns false - Failure
+   */
+  bool schedule_iat_transmit();
+
+  /**
+   * Inter-Arrivial Time obfuscation TX timer callback
+   */
+  void on_iat_transmit();
 
   /**
    * Encode and send an outgoing ScrambleSuit frame
@@ -184,7 +205,9 @@ class Client : public Socks5Server::Session {
   /** @} */
 
   /** @{ */
-  ProbDist packet_len_rng_; /**< Packet length morpher */
+  ProbDist packet_len_rng_;     /**< Packet length morpher */
+  ProbDist packet_int_rng_;     /**< Packet interval morpher */
+  struct event* iat_timer_ev_;  /**< Packet interval TX event */
   /** @} */
 };
 

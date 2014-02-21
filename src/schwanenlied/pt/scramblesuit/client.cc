@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <sys/time.h>
 
 #include <event2/buffer.h>
 
@@ -50,6 +51,7 @@ constexpr char Client::kLogger[];
 constexpr size_t Client::kPrngSeedLength;
 constexpr size_t Client::kMaxFrameLength;
 constexpr size_t Client::kMaxPayloadLength;
+constexpr uint32_t Client::kMaxPacketDelay;
 
 bool Client::on_client_authenticate(const uint8_t* uname,
                                     const uint8_t ulen,
@@ -125,63 +127,10 @@ void Client::on_incoming_data() {
 
   CLOG(DEBUG, kLogger) << "on_incoming_data(): Have " << len << " bytes";
 
-  // Calculate the padding to transform the burst
-  size_t pad_len = 0;
-  const size_t burst_tail_len = len % kMaxFrameLength;
-  const uint32_t sample_len = packet_len_rng_();
-  if (sample_len >= burst_tail_len)
-    pad_len = sample_len - burst_tail_len;
-  else
-    pad_len = (kMaxFrameLength - burst_tail_len) + sample_len;
-
-  CLOG(DEBUG, kLogger) << "Tail packet: " << burst_tail_len << " "
-                       << "Target: " << sample_len << " "
-                       << "Padding: " << pad_len;
-
-  while (len > 0) {
-    // Chop up len into MSS sized ScrambleSuit frames
-    const size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
-    uint8_t* p = ::evbuffer_pullup(buf, frame_payload_len);
-    if (p == nullptr) {
-      CLOG(ERROR, kLogger) << "Failed to pullup buffer "
-                           << "(" << this << ")";
-out_error:
-      delete this;
-      return;
-    }
-
-    // Try to piggyback the padding on payload if we can get away with it
-    if (pad_len >= kHeaderLength && pad_len + frame_payload_len <= kMaxPayloadLength) {
-      // XXX: In theory, it's possible to incrementally send padding as well?
-      if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength))
-        goto out_error;
-      pad_len = 0;
-    } else if (!send_outgoing_frame(p, frame_payload_len, 0))
-      goto out_error;
-
-    // Remove the processed payload from the rx queue
-    ::evbuffer_drain(buf, frame_payload_len);
-
-    len -= frame_payload_len;
-  }
-
-  // Welp, was not able to piggyback the padding, need to send empty frames
-  if (pad_len > 0) {
-    if (pad_len > kHeaderLength) {
-      if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength)) {
-        delete this;
-        return;
-      }
-    } else {
-      if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength)) {
-        delete this;
-        return;
-      }
-      if (!send_outgoing_frame(nullptr, 0, pad_len)) {
-        delete this;
-        return;
-      }
-    }
+  // Schedule the next transmit
+  if (!schedule_iat_transmit()) {
+    delete this;
+    return;
   }
 }
 
@@ -358,8 +307,13 @@ out_error:
           packet_len_rng_.reset(decode_buf_.data() + kHeaderLength,
                                 decode_payload_len_, kHeaderLength,
                                 kMaxFrameLength);
+          packet_int_rng_.reset(decode_buf_.data() + kHeaderLength,
+                                decode_payload_len_, 0,
+                                kMaxPacketDelay);
           CLOG(DEBUG, kLogger) << "Packet length probabilities: "
                                << packet_len_rng_.to_string();
+          CLOG(DEBUG, kLogger) << "Packet interval probabilities (x100 usec): "
+                               << packet_int_rng_.to_string();
           break;
         case PacketFlags::kNEW_TICKET: // FALLSTHROUGH
         default:
@@ -378,8 +332,18 @@ out_error:
   }
 }
 
-void Client::on_outgoing_drained() {
-  /* When Protocol Polymorphism is supported, do something here */
+bool Client::on_outgoing_flush() {
+  /*
+   * This is called when incoming_ is closed, and the base instance wants to
+   * know if it is safe to discard the session.  The first call is from the
+   * incoming_ event callback, all other subsequent calls will be made when
+   * outgoing_'s write buffer is drained (which is defered).
+   *
+   * If the timer is pending, then there is data queued for transmission.  If
+   * incoming_'s read buffer is drained, the timer won't be pending, so it's
+   * safe to flush things.
+   */
+  return !evtimer_pending(iat_timer_ev_, NULL);
 }
 
 bool Client::kdf_scramblesuit(const crypto::SecureBuffer& k_t) {
@@ -422,6 +386,106 @@ bool Client::kdf_scramblesuit(const crypto::SecureBuffer& k_t) {
     return false;
 
   return true;
+}
+
+bool Client::schedule_iat_transmit() {
+  // Lazy timer initialization
+  if (iat_timer_ev_ == nullptr) {
+    event_callback_fn cb = [](evutil_socket_t sock,
+                              short witch,
+                              void* arg) {
+      reinterpret_cast<Client*>(arg)->on_iat_transmit();
+    };
+    iat_timer_ev_ = evtimer_new(base_, cb, this);
+    if (iat_timer_ev_ == nullptr) {
+      CLOG(ERROR, kLogger) << "Failed to initialize IAT timer";
+      return false;
+    }
+  }
+
+  // If the IAT timer is pending, then return (Should never happen)
+  if (evtimer_pending(iat_timer_ev_, NULL)) {
+    CLOG(DEBUG, kLogger) << "schedule_iat_transmit() called when pending?";
+    return true;
+  }
+
+  // Schedule the next transmit based off the RNG
+  struct timeval tv;
+  tv.tv_sec = 0;
+  tv.tv_usec = packet_int_rng_() * 100;
+  evtimer_add(iat_timer_ev_, &tv);
+
+  CLOG(DEBUG, kLogger) << "Next IAT TX in: " << tv.tv_usec << " usec";
+
+  return true;
+}
+
+void Client::on_iat_transmit() {
+  if (state_ != State::kESTABLISHED && state_ != State::kFLUSHING_OUTGOING)
+    return;
+
+  struct evbuffer* buf = ::bufferevent_get_input(incoming_);
+  const size_t len = ::evbuffer_get_length(buf);
+  if (len == 0)
+    return;
+
+  CLOG(DEBUG, kLogger) << "on_iat_transmit(): Have " << len << " bytes";
+
+  const size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
+  uint8_t* p = ::evbuffer_pullup(buf, frame_payload_len);
+  if (p == nullptr) {
+    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
+                         << "(" << this << ")";
+out_error:
+    delete this;
+    return;
+  }
+
+  size_t pad_len = 0;
+  if (frame_payload_len < kMaxPayloadLength || len == kMaxPayloadLength) {
+    /*
+     * Only append padding if the transmitted frame is not full sized, unless
+     * sending a full sized frame will completely drain the IAT buffer.
+     *
+     * I don't *think* that sending full frames without padding in the case of
+     * sustained data transfer is something that's fingerprintable and it would
+     * look more suspicious if "sustained" bursts had random padding.
+     */
+    const size_t burst_tail_len = frame_payload_len % kMaxFrameLength;
+    const uint32_t sample_len = packet_len_rng_();
+    if (sample_len >= burst_tail_len)
+      pad_len = sample_len - burst_tail_len;
+    else
+      pad_len = (kMaxFrameLength - burst_tail_len) + sample_len;
+  }
+
+  if (pad_len >= kHeaderLength && pad_len + frame_payload_len <= kMaxPayloadLength) {
+    // XXX: In theory, it's possible to incrementally send padding as well?
+    if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength))
+      goto out_error;
+    pad_len = 0;
+  } else if (!send_outgoing_frame(p, frame_payload_len, 0))
+    goto out_error;
+
+  // Remove the processed payload from the rx queue
+  ::evbuffer_drain(buf, frame_payload_len);
+
+  // Send remaining padding if any exists
+  if (pad_len > kHeaderLength) {
+    if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength))
+      goto out_error;
+  } else if (pad_len > 0) {
+    if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength))
+      goto out_error;
+    if (!send_outgoing_frame(nullptr, 0, pad_len))
+      goto out_error;
+  }
+
+  if (::evbuffer_get_length(buf) > 0) {
+    if (!schedule_iat_transmit())
+      goto out_error;
+  } else
+    CLOG(DEBUG, kLogger) << "IAT TX buffer drained";
 }
 
 bool Client::send_outgoing_frame(const uint8_t* buf,

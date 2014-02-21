@@ -561,7 +561,8 @@ void Socks5Server::Session::incoming_event_cb(const short events) {
   if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
     incoming_valid_ = false;
     const struct evbuffer* buf = ::bufferevent_get_output(outgoing_);
-    if (!outgoing_valid_ || ::evbuffer_get_length(buf) == 0) {
+    if (!outgoing_valid_ || (::evbuffer_get_length(buf) == 0 &&
+                             !on_outgoing_flush())) {
       // Outgoing is invalid or fully flushed, done!
       CLOG(INFO, kLogger) << "Session closed (" << this << ")";
       delete this;
@@ -657,7 +658,7 @@ void Socks5Server::Session::outgoing_read_cb() {
 void Socks5Server::Session::outgoing_write_cb() {
   if (state_ == State::kCONNECTING || state_ == State::kESTABLISHED)
     on_outgoing_drained();
-  else if (state_ == State::kFLUSHING_OUTGOING) {
+  else if (state_ == State::kFLUSHING_OUTGOING && on_outgoing_flush()) {
     CLOG(INFO, kLogger) << "Session closed (" << this << ")";
     delete this;
   }
