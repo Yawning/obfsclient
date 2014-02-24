@@ -141,7 +141,7 @@ bool UniformDH::compute_key(const uint8_t* pub_key,
    */
 
   int sz = ::DH_compute_key(&shared_secret_[0], peer_public_key, ctx_);
-  if (sz > 0 && sz <= static_cast<int>(shared_secret_.size())) {
+  if (sz >= 0 && sz <= static_cast<int>(shared_secret_.size())) {
     const int offset = shared_secret_.size() - sz;
     shared_secret_.resize(sz);
     shared_secret_.insert(0, offset, 0); // Ugh......
