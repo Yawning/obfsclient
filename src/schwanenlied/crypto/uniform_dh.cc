@@ -38,7 +38,8 @@
 namespace schwanenlied {
 namespace crypto {
 
-UniformDH::UniformDH() :
+UniformDH::UniformDH(const uint8_t* priv_key,
+                     const size_t len) :
     ctx_(::DH_new()),
     public_key_(kKeyLength, 0),
     has_shared_secret_(false),
@@ -81,33 +82,44 @@ UniformDH::UniformDH() :
 
   /*
    * To pick a private UniformDH key, we pick a random 1536-bit number,
-   * and make it even by setting its low bit to 0. Let x be that private
+   * and make it even by setting its low bit to 0.  Let x be that private
    * key, and X = g^x (mod p).
    */
 
-  int ret = ::BN_rand(ctx_->priv_key, kKeyLength * 8, -1, 0);
-  SL_ASSERT(ret == 1);
+  int ret = 0;
+  if (priv_key != nullptr) {
+    /* Use a explicitly specified private key */
+    SL_ASSERT(len == kKeyLength);
+    ctx_->priv_key = ::BN_bin2bn(priv_key, len, nullptr);
+    SL_ASSERT(ctx_->priv_key != nullptr);
+  } else {
+    /* Generate a random private key */
+    SL_ASSERT(len == 0);
+    ret = ::BN_rand(ctx_->priv_key, kKeyLength * 8, -1, 0);
+    SL_ASSERT(ret == 1);
+  }
   const bool is_odd = BN_is_odd(ctx_->priv_key);
   ret = ::BN_clear_bit(ctx_->priv_key, 0);
   SL_ASSERT(ret == 1);
 
+  /* Generate X = g^x (mod p) */
   ret = ::DH_generate_key(ctx_);
   SL_ASSERT(ret == 1);
-  if (is_odd) {
-    // Calculate X = p - X
-    BIGNUM* p_sub_X  = ::BN_new();
-    SL_ASSERT(p_sub_X != nullptr);
-    ret = ::BN_sub(p_sub_X, ctx_->p, ctx_->pub_key);
-    SL_ASSERT(ret == 1);
-    ::BN_free(ctx_->pub_key);
-    ctx_->pub_key = p_sub_X;
-  }
 
-  // Only need the public key that's going to be sent
-  const int offset = public_key_.size() - BN_num_bytes(ctx_->pub_key);
-  ret = ::BN_bn2bin(ctx_->pub_key, reinterpret_cast<unsigned
-                    char*>(&public_key_[offset]));
+  /* Generate X' = p - X */
+  BIGNUM* p_sub_X = ::BN_new();
+  SL_ASSERT(p_sub_X != nullptr);
+  ret = ::BN_sub(p_sub_X, ctx_->p, ctx_->pub_key);
+  SL_ASSERT(ret == 1);
+
+  /* Store the key the caller visibile public key */
+  const BIGNUM* pub_key = (is_odd) ? p_sub_X : ctx_->pub_key;
+  const int offset = public_key_.size() - BN_num_bytes(pub_key);
+  ret = ::BN_bn2bin(pub_key, reinterpret_cast<unsigned char*>
+                    (&public_key_[offset]));
   SL_ASSERT(ret + offset == static_cast<int>(kKeyLength));
+
+  ::BN_free(p_sub_X);
 }
 
 UniformDH::~UniformDH() {

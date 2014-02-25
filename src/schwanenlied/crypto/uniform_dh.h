@@ -58,8 +58,14 @@ class UniformDH {
 
   /**
    * Construct a UniformDH instance
+   *
+   * @warning Using a explicit private key should ONLY be used for testing.
+   *
+   * @param[in] priv_key    A pointer to the private key
+   * @param[in] len         Length of the key (MUST be kKeyLength bytes)
    */
-  UniformDH();
+  UniformDH(const uint8_t* priv_key = nullptr,
+            const size_t len = 0);
 
   ~UniformDH();
 
