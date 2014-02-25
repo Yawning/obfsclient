@@ -129,7 +129,7 @@ void Client::on_incoming_data() {
 
   // Schedule the next transmit
   if (!schedule_iat_transmit()) {
-    delete this;
+    server_.close_session(this);
     return;
   }
 }
@@ -180,7 +180,7 @@ void Client::on_outgoing_data() {
         CLOG(ERROR, kLogger) << "Failed to read frame header "
                              << "(" << this << ")";
 out_error:
-        delete this;
+        server_.close_session(this);
         return;
       }
       decode_buf_len_ += kHeaderLength;
@@ -441,7 +441,7 @@ void Client::on_iat_transmit() {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
 out_error:
-    delete this;
+    server_.close_session(this);
     return;
   }
 

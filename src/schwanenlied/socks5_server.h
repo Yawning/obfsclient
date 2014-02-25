@@ -79,13 +79,14 @@ class Socks5Server {
    * to call send_socks5_response() from the on_outgoing_connected() callback,
    * and shuffle data between incoming_ and outgoing_ in
    * incoming_read_cb()/outgoing_read_cb().  When it is neccecary to terminate a
-   * session, deleting the instance will do the right thing.
+   * session, calling close_session(this) will do the correct thing.
    */
   class Session {
    public:
     /**
      * Construct a Session instance
      *
+     * @param[in] server        The Socks5Server associated with the session
      * @param[in] base          The libevent2 event_base associated with the
      *                          Socks5Server
      * @param[in] sock          The Client to SOCKS server socket
@@ -93,7 +94,8 @@ class Socks5Server {
      * @param[in] require_auth  Authentication is required?
      * @param[in] scrub_addrs   Scrub addresses in logs
      */
-    Session(struct event_base* base,
+    Session(Socks5Server& server,
+            struct event_base* base,
             const evutil_socket_t sock,
             const ::std::string& addr,
             const bool require_auth = false,
@@ -187,6 +189,8 @@ class Socks5Server {
     void send_socks5_response(const Reply reply);
 
     /** @{ */
+    /** The Socks5Server */
+    Socks5Server& server_;
     /** The libevent2 event_base */
     struct event_base* base_;
     /** The Client to SOCKS Server bufferevent */
@@ -309,6 +313,7 @@ class Socks5Server {
     /**
      * Create a new Session instance
      *
+     * @param[in] server      The Socks5Server associated with the session
      * @param[in] base        The libevent2 event_base associated with the
      *                        Socks5Server
      * @param[in] sock        The Client to SOCKS server socket
@@ -318,7 +323,8 @@ class Socks5Server {
      * @returns A pointer to a valid Session instance
      * @returns nullptr - Session initialization failed (caller will close sock)
      */
-    virtual Session* create_session(struct event_base* base,
+    virtual Session* create_session(Socks5Server& server,
+                                    struct event_base* base,
                                     const evutil_socket_t sock,
                                     const ::std::string& addr,
                                     const bool scrub_addrs = true) = 0;
@@ -373,6 +379,16 @@ class Socks5Server {
    */
   void close();
   /** @} */
+
+  /**
+   * Close a speciic session
+   *
+   * @param[in] session   The session to close
+   */
+  void close_session(Session* session);
+
+  /** Close all of the existing sessions */
+  void close_sessions();
 
   /**
    * Convert a sockaddr to a std::string
@@ -431,6 +447,7 @@ class Socks5Server {
   struct evconnlistener* listener_;   /**< The SOCKS server socket */
   struct sockaddr_in listener_addr_;  /**< The SOCKS server socket address */
   ::std::string listener_addr_str_;   /**< The SOCKS 5 server socket address */
+  ::std::list< ::std::unique_ptr<Session>> sessions_; /**< The session table */
 };
 
 } // namespace schwanenlied

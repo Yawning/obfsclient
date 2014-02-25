@@ -165,7 +165,7 @@ void Client::on_incoming_data() {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
 out_error:
-    delete this;
+    server_.close_session(this);
     return;
   }
   if (!initiator_aes_.process(p, len, p)) {
@@ -293,7 +293,7 @@ void Client::on_outgoing_data() {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
 out_error:
-    delete this;
+    server_.close_session(this);
     return;
   }
   if (!responder_aes_.process(p, len, p)) {

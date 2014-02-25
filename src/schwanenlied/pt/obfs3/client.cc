@@ -91,7 +91,7 @@ void Client::on_incoming_data() {
       if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
         CLOG(ERROR, kLogger) << "Failed to send post-key padding "
                              << "(" << this << ")";
-        delete this;
+        server_.close_session(this);
         return;
       }
     }
@@ -101,7 +101,7 @@ void Client::on_incoming_data() {
                                  initiator_magic_.size())) {
       CLOG(ERROR, kLogger) << "Failed to send initiator magic "
                            << "(" << this << ")";
-      delete this;
+      server_.close_session(this);
       return;
     }
     sent_magic_ = true;
@@ -118,7 +118,7 @@ void Client::on_incoming_data() {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
 out_error:
-    delete this;
+    server_.close_session(this);
     return;
   }
   if (!initiator_aes_.process(p, len, p)) {
@@ -194,7 +194,7 @@ void Client::on_outgoing_data() {
     if (found.pos > static_cast<ssize_t>(kMaxPadding + 1)) {
       CLOG(WARNING, kLogger) << "Peer sent too much padding: " << found.pos << " "
                              << "(" << this << ")";
-      delete this;
+      server_.close_session(this);
       return;
     }
     ::evbuffer_drain(buf, found.pos + responder_magic_.size());
@@ -212,7 +212,7 @@ void Client::on_outgoing_data() {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
 out_error:
-    delete this;
+    server_.close_session(this);
     return;
   }
   if (!responder_aes_.process(p, len, p)) {

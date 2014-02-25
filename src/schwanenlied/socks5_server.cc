@@ -43,6 +43,7 @@ constexpr char Socks5Server::kLogger[];
 
 Socks5Server::~Socks5Server() {
   close();
+  close_sessions();
 }
 
 const bool Socks5Server::addr(struct sockaddr_in& addr) const {
@@ -99,10 +100,29 @@ bool Socks5Server::bind() {
 
 void Socks5Server::close() {
   if (listener_ != nullptr) {
-    CLOG(INFO, kLogger) << "Closing listner " << listener_addr_str_;
+    CLOG(INFO, kLogger) << "Closing listener " << listener_addr_str_;
 
     ::evconnlistener_free(listener_);
     listener_ = nullptr;
+  }
+}
+
+void Socks5Server::close_session(Session* session) {
+  for (auto iter = sessions_.begin(); iter != sessions_.end(); ++iter) {
+    if ((*iter).get() == session) {
+      iter = sessions_.erase(iter);
+      return;
+    }
+  }
+}
+
+void Socks5Server::close_sessions() {
+  if (sessions_.size() > 0) {
+    CLOG(INFO, kLogger) << "Force closing sessions";
+    for (auto iter = sessions_.begin(); iter != sessions_.end(); ++iter) {
+      (*iter).reset(nullptr);
+    }
+    sessions_.clear();
   }
 }
 
@@ -112,27 +132,25 @@ void Socks5Server::on_new_connection(evutil_socket_t sock,
   // Don't bother scrubbing the client address (loopback)
   ::std::string client_addr = addr_to_string(addr, false);
 
-  /*
-   * Yes, this may look like it's leaking memory, but, there's libevent goodness
-   * that holds a pointer to the Session object as the opaque callback arg.
-   */
-
-  Session* session = factory_->create_session(base_, sock, client_addr,
+  Session* session = factory_->create_session(*this, base_, sock, client_addr,
                                               scrub_addrs_);
-  if (session == nullptr)
+  if (session == nullptr) {
     evutil_closesocket(sock);
-
-  CLOG(INFO, kLogger) << "New client connection "
-                      << "(" << this << ": " << client_addr << " -> "
-                             << listener_addr_str_ << ")";
-
+  } else {
+    CLOG(INFO, kLogger) << "New client connection "
+                        << "(" << this << ": " << client_addr << " -> "
+                               << listener_addr_str_ << ")";
+    sessions_.push_back(::std::unique_ptr<Session>(session));
+  }
 }
 
-Socks5Server::Session::Session(struct event_base* base,
+Socks5Server::Session::Session(Socks5Server& server,
+                               struct event_base* base,
                                const evutil_socket_t sock,
                                const ::std::string& client_addr,
                                const bool require_auth,
                                const bool scrub_addrs) :
+    server_(server),
     base_(base),
     incoming_(nullptr),
     outgoing_(nullptr),
@@ -254,7 +272,8 @@ error_reply:
   if (0 != ::bufferevent_write(incoming_, resp, resp_len)) {
     CLOG(ERROR, kLogger) << "Failed to write SOCKS response, closing "
                          << "(" << this << ")";
-    delete this;
+    server_.close_session(this);
+    return;
   } else if (state_ == State::kESTABLISHED) {
     ::bufferevent_enable(incoming_, EV_READ);
     CLOG(INFO, kLogger) << "Connection setup complete "
@@ -309,7 +328,7 @@ void Socks5Server::Session::incoming_read_methods_cb() {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
 out_free:
-    delete this;
+    server_.close_session(this);
     return;
   }
 
@@ -405,7 +424,7 @@ out_fail:
     if (0 != ::bufferevent_write(incoming_, resp, sizeof(resp))) {
       CLOG(ERROR, kLogger) << "Failed to write auth response, closing "
                            << "(" << this << ")";
-      delete this;
+      server_.close_session(this);
       return;
     }
 
@@ -450,7 +469,7 @@ out_fail:
   if (0 != ::bufferevent_write(incoming_, resp, sizeof(resp))) {
     CLOG(ERROR, kLogger) << "Failed to write auth response, closing "
                          << "(" << this << ")";
-    delete this;
+    server_.close_session(this);
     return;
   }
   ::evbuffer_drain(buf, 2 + ulen + 1 + plen);
@@ -553,7 +572,8 @@ void Socks5Server::Session::incoming_write_cb() {
     on_incoming_drained();
   else if (state_ == State::kFLUSHING_INCOMING) {
     CLOG(INFO, kLogger) << "Session closed (" << this << ")";
-    delete this;
+    server_.close_session(this);
+    return;
   }
 }
 
@@ -565,7 +585,8 @@ void Socks5Server::Session::incoming_event_cb(const short events) {
                              !on_outgoing_flush())) {
       // Outgoing is invalid or fully flushed, done!
       CLOG(INFO, kLogger) << "Session closed (" << this << ")";
-      delete this;
+      server_.close_session(this);
+      return;
     } else {
       // Need to attempt to flush outgoing first
       CLOG(DEBUG, kLogger) << "Local connection closed, flushing remote "
@@ -660,7 +681,8 @@ void Socks5Server::Session::outgoing_write_cb() {
     on_outgoing_drained();
   else if (state_ == State::kFLUSHING_OUTGOING && on_outgoing_flush()) {
     CLOG(INFO, kLogger) << "Session closed (" << this << ")";
-    delete this;
+    server_.close_session(this);
+    return;
   }
 }
 
@@ -671,7 +693,8 @@ void Socks5Server::Session::outgoing_event_cb(const short events) {
     if (!incoming_valid_ || ::evbuffer_get_length(buf) == 0) {
       // Incoming is invalid or fully flushed, done!
       CLOG(INFO, kLogger) << "Session closed (" << this << ")";
-      delete this;
+      server_.close_session(this);
+      return;
     } else {
       // Need to attempt to flush incoming first
       CLOG(DEBUG, kLogger) << "Remote connection closed, flushing local "

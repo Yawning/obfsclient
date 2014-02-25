@@ -57,20 +57,22 @@ class Client : public Socks5Server::Session {
  public:
   /** Client factory */
   class SessionFactory : public Socks5Server::SessionFactory {
-    Socks5Server::Session* create_session(struct event_base* base,
+    Socks5Server::Session* create_session(Socks5Server& server,
+                                          struct event_base* base,
                                           const evutil_socket_t sock,
                                           const ::std::string& addr,
                                           const bool scrub_addrs) override {
-      return static_cast<Socks5Server::Session*>(new Client(base, sock, addr,
-                                                            scrub_addrs));
+      return static_cast<Socks5Server::Session*>(new Client(server, base, sock,
+                                                            addr, scrub_addrs));
     }
   };
 
-  Client(struct event_base* base,
+  Client(Socks5Server& server,
+         struct event_base* base,
          const evutil_socket_t sock,
          const ::std::string& addr,
          const bool scrub_addrs) :
-      Session(base, sock, addr, false, scrub_addrs),
+      Session(server, base, sock, addr, false, scrub_addrs),
       logger_(::el::Loggers::getLogger(kLogger)),
       received_seed_hdr_(false),
       resp_pad_len_(0),

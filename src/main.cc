@@ -58,18 +58,21 @@ enum kOptionIndex {
   kUNKNOWN,
   kHELP,
   kDEBUG,
-  kUNSAFE_LOGS
+  kUNSAFE_LOGS,
+  kWAIT_FOR_DEBUGGER
 };
 
 const ::option::Descriptor kUsage[] = {
   { kUNKNOWN, 0, "", "", ::option::Arg::None,
     "usage: obfsclient [OPTION]" },
   { kHELP, 0, "", "help", ::option::Arg::Optional,
-    "  --help         Print usage." },
+    "  --help              Print usage." },
   { kDEBUG, 0, "", "debug", ::option::Arg::Optional,
-    "  --debug        Enable debugging." },
+    "  --debug             Enable debugging." },
   { kUNSAFE_LOGS, 0, "", "unsafe-logs", ::option::Arg::Optional,
-    "  --unsafe-logs  Unsafe logging." },
+    "  --unsafe-logs       Unsafe logging." },
+  { kWAIT_FOR_DEBUGGER, 0, "", "wait-for-debugger", ::option::Arg::Optional,
+    "  --wait-for-debugger Sleep after parsing command line args." },
   { 0, 0, nullptr, nullptr, 0, nullptr }
 };
 
@@ -87,6 +90,7 @@ constexpr char kObfs3MethodName[] = "obfs3";
 constexpr char kScrambleSuitMethodName[] = "scramblesuit";
 
 struct event_base* ev_base = nullptr;
+int nr_sigints = 0;
 
 bool init_statedir(const allium_ptcfg* cfg,
                    ::std::string& path) {
@@ -198,8 +202,12 @@ int main(int argc, char* argv[]) {
   }
   const bool debug = options[kDEBUG];
   const bool scrub_ips = !options[kUNSAFE_LOGS];
+  volatile bool wait_for_debugger = options[kWAIT_FOR_DEBUGGER];
   delete[] options;
   delete[] buffer;
+
+  while (wait_for_debugger)
+    sleep(0);
 
   // Start the PT configuration
   allium_ptcfg* cfg = ::allium_ptcfg_init();
@@ -238,7 +246,32 @@ int main(int argc, char* argv[]) {
 
   SL_ASSERT(factories.size() == listeners.size());
   if (dispatch_loop) {
-    // TODO: Install a SIGINT handler (Tor just kills us anyway)
+    // Install a SIGINT handler
+    event_callback_fn cb = [](evutil_socket_t sock,
+                              short which,
+                              void* arg) {
+      ::std::list< ::std::unique_ptr<Socks5Server>>* servers =
+          reinterpret_cast< ::std::list< ::std::unique_ptr<Socks5Server>>*>(arg);
+      nr_sigints++;
+      switch (nr_sigints) {
+      case 1:
+        CLOG(INFO, kLogger) << "Closing all listeners";
+        for (auto iter = servers->begin(); iter != servers->end(); ++iter)
+          (*iter)->close();
+        break;
+      case 2:
+        CLOG(INFO, kLogger) << "Closing all sessions";
+        // Technically, don't need to do anything because the dtor will do this.
+        for (auto iter = servers->begin(); iter != servers->end(); ++iter)
+          (*iter)->close_sessions();
+        // FALLSTHROUGH
+      default:
+        ::event_base_loopbreak(ev_base);
+        break;
+      }
+    };
+    struct event* ev_sigint = evsignal_new(ev_base, SIGINT, cb, &listeners);
+    evsignal_add(ev_sigint, nullptr);
 
     // Mask off SIGPIPE
     ::signal(SIGPIPE, SIG_IGN);
