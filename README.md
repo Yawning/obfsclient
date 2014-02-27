@@ -70,7 +70,7 @@ Caveats:
 
 ### TODO (Patches accepted!)
 
- * A connection timeout.
+ * See the [issue tracker](https://github.com/Yawning/obfsclient/issues).
 
 ### WON'T DO
 

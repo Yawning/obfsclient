@@ -181,12 +181,15 @@ class Socks5Server {
      * destroyed after the response is sent.
      *
      * @warning On certain libevent failures, this routine will destroy the
-     * session, so after invoking this, it is UNSAFE to touch the session for
-     * the remainer of the callback.
+     * session, the return value must be checked after calling this routine
+     * before touching the session.
      *
      * @param[in] reply The reply code to be sent
+     *
+     * @returns true  - reply == kSUCCEEDED and response sent
+     * @returns false - Session torn down
      */
-    void send_socks5_response(const Reply reply);
+    bool send_socks5_response(const Reply reply);
 
     /** @{ */
     /** The Socks5Server */
@@ -226,6 +229,7 @@ class Socks5Server {
     Session(const Session&) = delete;
     void operator=(const Session&) = delete;
 
+    /** The SOCKS protocol version */
     static constexpr uint8_t kSocksVersion = 0x05;
 
     /** The SOCKSv5 authentication methods */
@@ -251,13 +255,20 @@ class Socks5Server {
       kIPv6 = 0x04        /**< IPv6 */
     };
 
+    /** The State::kCONNECTING timeout in seconds */
+    static constexpr int kConnectTimeout = 60;
+
     const bool auth_required_;  /**< Client must authenticate? */
     const bool scrub_addrs_;    /**< Should scrub addresses when logging? */
     AuthMethod auth_method_; /**< Negotiated auth method */
     bool incoming_valid_; /**< incoming_ connected? */
     bool outgoing_valid_; /**< outgoing_ connected? */
+    struct event* connect_timer_ev_;  /** State::kCONNECTING timeout event */
 
     /** @{ */
+    /** The State::kCONNECTING timeout callback */
+    void connect_timeout_cb();
+
     /** The Client to SOCKS server bufferevent read callback */
     void incoming_read_cb();
 

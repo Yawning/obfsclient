@@ -125,13 +125,17 @@ void Client::on_outgoing_connected() {
      * The Session Ticket Handshake 'succeeds' immediately after sending a
      * ticket, and if it actually fails due to an invalid ticket, the peer
      * will drop the connection.
+     *
+     * We will defer sending the SOCKS5 response till the peer actually sends
+     * data because obfsproxy doesn't have a timeout on incoming connections.
      */
-    CLOG(INFO, kLogger) << "Finished Session Ticket handshake "
+    CLOG(INFO, kLogger) << "Session Ticket handshake sent"
                         << "(" << this << ": " << client_addr_str_ << " <-> "
                                << remote_addr_str_ << ")";
-    send_socks5_response(Reply::kSUCCEDED);
+    handshake_ = HandshakeMethod::kSESSION_TICKET;
   } else {
     // UniformDH handshake
+    handshake_ = HandshakeMethod::kUNIFORM_DH;
     uniformdh_handshake_ = ::std::unique_ptr<UniformDHHandshake>(
         new UniformDHHandshake(*this, shared_secret_));
     if (uniformdh_handshake_ == nullptr) {
@@ -166,18 +170,38 @@ void Client::on_incoming_data() {
 void Client::on_outgoing_data_connecting() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
-  // UniformDH handshake
-  SL_ASSERT(uniformdh_handshake_ != nullptr);
-  bool done = false;
-  if (!uniformdh_handshake_->recv_handshake_msg(done)) {
-    CLOG(WARNING, kLogger) << "UniformDH handshake failed "
-                           << "(" << this << ")";
-    send_socks5_response(Reply::kGENERAL_FAILURE);
-  } else if (done) {
-    CLOG(INFO, kLogger) << "Finished UniformDH handshake "
+  if (handshake_ == HandshakeMethod::kSESSION_TICKET) {
+    SL_ASSERT(session_ticket_handshake_ != nullptr);
+
+    CLOG(INFO, kLogger) << "Finished SessionTicket handshake "
                         << "(" << this << ": " << client_addr_str_ << " <-> "
                                << remote_addr_str_ << ")";
-    send_socks5_response(Reply::kSUCCEDED);
+    /*
+     * Ok, the peer sent what I imagine to be a frame, the session is probably
+     * established.
+     */
+    if (send_socks5_response(Reply::kSUCCEDED)) {
+      /*
+       * Manually invoke the callback that caused this one to get triggered in
+       * the first place.
+       */
+      on_outgoing_data();
+    }
+  } else {
+    // UniformDH handshake
+    SL_ASSERT(handshake_ == HandshakeMethod::kUNIFORM_DH);
+    SL_ASSERT(uniformdh_handshake_ != nullptr);
+    bool done = false;
+    if (!uniformdh_handshake_->recv_handshake_msg(done)) {
+      CLOG(WARNING, kLogger) << "UniformDH handshake failed "
+                             << "(" << this << ")";
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+    } else if (done) {
+      CLOG(INFO, kLogger) << "Finished UniformDH handshake "
+                          << "(" << this << ": " << client_addr_str_ << " <-> "
+                                 << remote_addr_str_ << ")";
+      send_socks5_response(Reply::kSUCCEDED);
+    }
   }
 }
 
@@ -374,7 +398,7 @@ bool Client::on_outgoing_flush() {
   if (iat_timer_ev_ == nullptr)
     return true;
 
-  return !evtimer_pending(iat_timer_ev_, NULL);
+  return !evtimer_pending(iat_timer_ev_, nullptr);
 }
 
 bool Client::kdf_scramblesuit(const crypto::SecureBuffer& k_t) {

@@ -163,7 +163,8 @@ Socks5Server::Session::Session(Socks5Server& server,
     scrub_addrs_(scrub_addrs),
     auth_method_(AuthMethod::kNO_ACCEPTABLE),
     incoming_valid_(false),
-    outgoing_valid_(false) {
+    outgoing_valid_(false),
+    connect_timer_ev_(nullptr) {
   incoming_ = ::bufferevent_socket_new(base_, sock, BEV_OPT_CLOSE_ON_FREE |
                                        BEV_OPT_DEFER_CALLBACKS);
   SL_ASSERT(incoming_ != nullptr);
@@ -192,9 +193,11 @@ Socks5Server::Session::~Session() {
     bufferevent_free(outgoing_);
   if (incoming_ != nullptr)
     bufferevent_free(incoming_);
+  if (connect_timer_ev_ != nullptr)
+    ::event_free(connect_timer_ev_);
 }
 
-void Socks5Server::Session::send_socks5_response(const Reply reply) {
+bool Socks5Server::Session::send_socks5_response(const Reply reply) {
   uint8_t resp[22] = { 0 };
   size_t resp_len = 0;
 
@@ -249,6 +252,11 @@ void Socks5Server::Session::send_socks5_response(const Reply reply) {
         goto error_reply;
       }
 
+      // Disarm the timer
+      SL_ASSERT(connect_timer_ev_ != nullptr);
+      if (evtimer_pending(connect_timer_ev_, nullptr))
+        evtimer_del(connect_timer_ev_);
+
       state_ = State::kESTABLISHED;
     } else {
       CPLOG(ERROR, kLogger) << "Failed to getsockname() outgoing";
@@ -273,13 +281,16 @@ error_reply:
     CLOG(ERROR, kLogger) << "Failed to write SOCKS response, closing "
                          << "(" << this << ")";
     server_.close_session(this);
-    return;
+    return false;
   } else if (state_ == State::kESTABLISHED) {
     ::bufferevent_enable(incoming_, EV_READ);
     CLOG(INFO, kLogger) << "Connection setup complete "
                         << "(" << this << ": " << client_addr_str_ << " <-> "
                                << remote_addr_str_ << ")";
+    return true;
   }
+
+  return false;
 }
 
 void Socks5Server::Session::incoming_read_cb() {
@@ -567,6 +578,12 @@ void Socks5Server::Session::incoming_read_request_cb() {
   ::bufferevent_disable(incoming_, EV_READ);
 }
 
+void Socks5Server::Session::connect_timeout_cb() {
+  SL_ASSERT(state_ == State::kCONNECTING);
+  CLOG(WARNING, kLogger) << "Session handshake timeout (" << this << ")";
+  server_.close_session(this);
+}
+
 void Socks5Server::Session::incoming_write_cb() {
   if (state_ == State::kESTABLISHED)
     on_incoming_drained();
@@ -632,6 +649,26 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     // Flush the reply
     outgoing_event_cb(events);
   } else if (events & BEV_EVENT_CONNECTED) {
+    // Arm the handshake timeout
+    event_callback_fn timeoutcb = [](evutil_socket_t sock,
+                                     short which,
+                                     void* arg) {
+      reinterpret_cast<Session*>(arg)->connect_timeout_cb();
+    };
+    SL_ASSERT(connect_timer_ev_ == nullptr);
+    connect_timer_ev_ = evtimer_new(base_, timeoutcb, this);
+    if (connect_timer_ev_ == nullptr) {
+      CLOG(ERROR, kLogger) << "Failed to allocate timeout timer, closing "
+                           << "(" << this << ")";
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
+    }
+    struct timeval tv;
+    tv.tv_sec = kConnectTimeout;
+    tv.tv_usec = 0;
+    evtimer_add(connect_timer_ev_, &tv);
+
+    // Setup the bufferevents
     bufferevent_data_cb readcb = [](struct bufferevent *bev,
                                     void *ctx) {
       reinterpret_cast<Session*>(ctx)->outgoing_read_cb();

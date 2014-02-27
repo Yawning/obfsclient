@@ -79,6 +79,7 @@ class Client : public Socks5Server::Session {
          const bool scrub_addrs) :
       Session(server, base, sock, addr, true, scrub_addrs),
       logger_(::el::Loggers::getLogger(kLogger)),
+      handshake_(HandshakeMethod::kINVALID),
       decode_state_(FrameDecodeState::kREAD_HEADER),
       decode_buf_len_(0),
       packet_len_rng_(kHeaderLength, kMaxFrameLength),
@@ -130,6 +131,13 @@ class Client : public Socks5Server::Session {
   static constexpr uint32_t kMaxPacketDelay = 100;
   /** @} */
 
+  /** ScrambleSuit Handshake methods */
+  enum class HandshakeMethod {
+    kINVALID,           /**< Unknown handshake type */
+    kUNIFORM_DH,        /**< UniformDH */
+    kSESSION_TICKET     /**< Session Ticket */
+  };
+
   /** ScrambleSuit Packet Flag bitfield */
   enum PacketFlags {
     kPAYLOAD = 0x1,     /**< Payload packet */
@@ -179,6 +187,8 @@ class Client : public Socks5Server::Session {
   /** @{ */
   /** The 160 bit bridge secret (k_B) */
   crypto::SecureBuffer shared_secret_;
+  /** The handshake type used */
+  HandshakeMethod handshake_;
   /** The UniformDHHandshake instance */
   ::std::unique_ptr<UniformDHHandshake> uniformdh_handshake_;
   /** The SessionTicketHandshake instance */
