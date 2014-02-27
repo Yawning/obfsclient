@@ -237,7 +237,6 @@ class Socks5Server {
       kNONE_REQUIRED = 0x00,      /**< NO AUTHENTICATION RQUIRED */
       kGSSAPI = 0x01,             /**< GSSAPI (Unsupported) */
       kUSERNAME_PASSWORD = 0x02,  /**< USERNAME/PASSWORD (RFC1929) */
-      kTOR_EXTENDED = 0x80,       /**< Tor Pluggable Transport (EXPERIMENTAL) */
       kNO_ACCEPTABLE = 0xff       /**< NO ACCEPTABLE METHODS */
     };
 

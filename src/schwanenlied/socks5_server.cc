@@ -354,7 +354,6 @@ out_free:
 
   bool can_none = false;
   bool can_username_password = false;
-  bool can_tor_extended = false;
 
   for (int i = 0; i < nmethods; i++) {
     switch (p[2 + i]) {
@@ -364,19 +363,17 @@ out_free:
     case AuthMethod::kUSERNAME_PASSWORD:
       can_username_password = true;
       break;
-#if 0 // NOTYET - (https://trac.torproject.org/projects/tor/ticket/10671)
-    case AuthMethod::kTOR_EXTENDED:
-      can_tor_extended = true;
-      break;
-#endif
     }
   }
 
   if (auth_required_) {
-    if (can_tor_extended)
-      auth_method_ = AuthMethod::kTOR_EXTENDED;
-    else if (can_username_password)
+    if (can_username_password)
       auth_method_ = AuthMethod::kUSERNAME_PASSWORD;
+    else {
+      CLOG(WARNING, kLogger) << "Failed to negotiate compatible auth "
+                             << "(" << this << ")";
+      goto out_free;
+    }
   } else if (can_none)
     auth_method_ = AuthMethod::kNONE_REQUIRED;
 
@@ -396,7 +393,6 @@ out_free:
     state_ = State::kREAD_REQUEST;
     break;
   case AuthMethod::kUSERNAME_PASSWORD:
-  case AuthMethod::kTOR_EXTENDED:
     state_ = State::kAUTHENTICATING;
     break;
   default:
@@ -461,11 +457,6 @@ out_fail:
   if (len < static_cast<size_t>(2 + ulen + 1 + plen))
     return;
   const uint8_t* passwd = (plen > 0) ? p + 2 + ulen + 1 : nullptr;
-
-  /*
-   * TODO: For the proposed TOR_EXTENDED auth, a uint16_t and extended data are
-   * after passwd
-   */
 
   if (!on_client_authenticate(uname, ulen, passwd, plen)) {
     CLOG(WARNING, kLogger) << "Authentication failed, closing "
