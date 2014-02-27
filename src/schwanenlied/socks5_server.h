@@ -333,14 +333,17 @@ class Socks5Server {
   /**
    * Construct a Socks5Server
    *
+   * @param[in] state_dir   The state directory for Sessions
    * @param[in] factory     The SessionFactory to use when creating Session
    *                        instances for client connections
    * @param[in] base        The libevent2 event_base to use
    * @param[in] scrub_addrs Scrub addresses in logs
    */
-  Socks5Server(SessionFactory* factory,
+  Socks5Server(const std::string& state_dir,
+               SessionFactory* factory,
                struct event_base* base,
                const bool scrub_addrs = true) :
+      state_dir_(state_dir),
       factory_(factory),
       base_(base),
       scrub_addrs_(scrub_addrs),
@@ -352,6 +355,11 @@ class Socks5Server {
   ~Socks5Server();
 
   /** @{ */
+  /** Query the state directory Sessions can store files in */
+  const ::std::string state_dir() const {
+    return state_dir_;
+  }
+
   /**
    * Query the local address that the Socks5Server is listening on
    *
@@ -440,6 +448,7 @@ class Socks5Server {
                          struct sockaddr* addr,
                          int len);
 
+  ::std::string state_dir_;   /**< The state directory for Sessions */
   SessionFactory* factory_;   /**< The factory used to create Sessions */
   struct event_base* base_;   /**< The libevent2 event_base */
   const bool scrub_addrs_;    /**< Should scrub addresses when logging? */

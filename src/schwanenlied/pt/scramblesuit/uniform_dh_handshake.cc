@@ -56,8 +56,10 @@ uint16_t UniformDHHandshake::gen_padlen() const {
   return ret;
 }
 
-bool UniformDHHandshake::send_handshake_msg(struct bufferevent* sink) {
-  SL_ASSERT(sink != nullptr);
+bool UniformDHHandshake::send_handshake_msg() {
+  if (client_.outgoing_ == nullptr)
+    return false;
+  struct bufferevent* sink = client_.outgoing_;
 
   /*
    * UniformDH handshake:
@@ -66,7 +68,7 @@ bool UniformDHHandshake::send_handshake_msg(struct bufferevent* sink) {
    * X -> UniformDH public key
    * P_C -> Padding [0 - 1308] bytes
    * M_C = HMAC-SHA256-128(k_B, X)
-   * MAC = HMAC-SHA256-128(k_B, X | P_C | E)
+   * MAC = HMAC-SHA256-128(k_B, X | P_C | M_C | E)
    */
 
   if (!hmac_.init())
@@ -93,7 +95,7 @@ bool UniformDHHandshake::send_handshake_msg(struct bufferevent* sink) {
       return false;
   }
 
-  // HACKHACKHACKHACKHACK
+  // The spec doesn't include M_S but the code does
   if (!hmac_.update(m_c.data(), m_c.size()))
       return false;
 
@@ -120,8 +122,10 @@ bool UniformDHHandshake::send_handshake_msg(struct bufferevent* sink) {
   return true;
 }
 
-bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
-                                            bool& is_finished) {
+bool UniformDHHandshake::recv_handshake_msg(bool& is_finished) {
+  if (client_.outgoing_ == nullptr)
+    return false;
+  struct bufferevent* source = client_.outgoing_;
   struct evbuffer* buf = ::bufferevent_get_input(source);
 
   is_finished = false;
@@ -132,7 +136,7 @@ bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
    * Y -> UniformDH public key
    * P_S -> Padding [0 - 1308] bytes
    * M_S = HMAC-SHA256-128(k_B, Y)
-   * MAC = HMAC-SHA256-128(k_B, Y | P_S | E)
+   * MAC = HMAC-SHA256-128(k_B, Y | P_S | M_S | E)
    *
    * Note:
    * There is a network latency induced edge case here, as the current
@@ -187,8 +191,8 @@ bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
       return false;
 
     // MAC the padding if any
-    if (found.pos > 0) {
-      // HACKHACKHACKHACK
+    if (found.pos >= 0) {
+      /* The spec doesn't include M_S but the code does */
       const size_t to_mac = found.pos + remote_mark_->size();
       const uint8_t* p = ::evbuffer_pullup(buf, to_mac);
       if (p == nullptr)
@@ -243,9 +247,7 @@ bool UniformDHHandshake::recv_handshake_msg(struct bufferevent* source,
 
   // The the the that's all folks!
   is_finished = true;
-  has_shared_secret_ = true;
-
-  return true;
+  return client_.kdf_scramblesuit(shared_secret_);
 }
 
 } // namespace scramblesuit

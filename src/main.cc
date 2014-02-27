@@ -104,24 +104,19 @@ bool init_statedir(const allium_ptcfg* cfg,
   return true;
 }
 
-void init_logging(const bool enabled,
-                  const ::std::string& path,
+void init_logging(const ::std::string& path,
                   const bool debug) {
   ::el::Configurations conf;
+
   conf.setToDefault();
-  if (enabled) {
-    // Ok, there's a state directory, enable logging
-    conf.setToDefault();
-    conf.setGlobally(::el::ConfigurationType::ToStandardOutput, "false");
-    conf.setGlobally(::el::ConfigurationType::Filename,
-                     path + ::std::string(kLogFileName));
-    conf.set(::el::Level::Debug, ::el::ConfigurationType::Format,
-             "%datetime %level [%logger] %msg");
-    if (!debug)
-      conf.set(::el::Level::Debug, ::el::ConfigurationType::Enabled, "false");
-    ::el::Helpers::addFlag(el::LoggingFlag::ImmediateFlush);
-  } else
-    conf.setGlobally(::el::ConfigurationType::Enabled, "false");
+  conf.setGlobally(::el::ConfigurationType::ToStandardOutput, "false");
+  conf.setGlobally(::el::ConfigurationType::Filename,
+                   path + ::std::string(kLogFileName));
+  conf.set(::el::Level::Debug, ::el::ConfigurationType::Format,
+           "%datetime %level [%logger] %msg");
+  if (!debug)
+    conf.set(::el::Level::Debug, ::el::ConfigurationType::Enabled, "false");
+  ::el::Helpers::addFlag(el::LoggingFlag::ImmediateFlush);
   ::el::Loggers::setDefaultConfigurations(conf, true);
   (void)::el::Loggers::getLogger(kLogger);
 }
@@ -135,10 +130,11 @@ bool init_libevent() {
 
 template<class Factory>
 bool init_pt(const allium_ptcfg* cfg,
-                    const char* name,
-                    ::std::list< ::std::unique_ptr<Socks5Factory>>& factories,
-                    ::std::list< ::std::unique_ptr<Socks5Server>>& listeners,
-                    const bool scrub_addrs = true) {
+             const ::std::string state_dir,
+             const char* name,
+             ::std::list< ::std::unique_ptr<Socks5Factory>>& factories,
+             ::std::list< ::std::unique_ptr<Socks5Server>>& listeners,
+             const bool scrub_addrs = true) {
   if (::allium_ptcfg_method_requested(cfg, name) != 1)
     return false;
 
@@ -149,7 +145,8 @@ bool init_pt(const allium_ptcfg* cfg,
   }
 
   Factory* factory = new Factory;
-  Socks5Server* listener = new Socks5Server(factory, ev_base, scrub_addrs);
+  Socks5Server* listener = new Socks5Server(state_dir, factory, ev_base,
+                                            scrub_addrs);
   if (!listener->bind()) {
     CLOG(ERROR, kLogger) << "Failed to bind() a SOCKSv5 listener";
     ::allium_ptcfg_method_error(cfg, name, "Socks5::bind()");
@@ -222,8 +219,13 @@ int main(int argc, char* argv[]) {
 
   // Determine the state directory and initialize logging
   ::std::string state_dir;
-  const bool has_state_dir = init_statedir(cfg, state_dir);
-  init_logging(has_state_dir, state_dir, debug);
+  if (!init_statedir(cfg, state_dir)) {
+    // Should NEVER happen
+    ::allium_ptcfg_methods_done(cfg);
+    ::allium_ptcfg_free(cfg);
+    return -1;
+  }
+  init_logging(state_dir, debug);
 
   // Log a banner
   CLOG(INFO, kLogger) << "obfsclient - Initialized (PID: " << ::getpid() << ")";
@@ -232,11 +234,12 @@ int main(int argc, char* argv[]) {
   ::std::list< ::std::unique_ptr<Socks5Factory>> factories;
   ::std::list< ::std::unique_ptr<Socks5Server>> listeners;
   bool dispatch_loop = false;
-  dispatch_loop |= init_pt<Obfs3Factory>(cfg, kObfs3MethodName, factories,
-                                         listeners, scrub_ips);
-  dispatch_loop |= init_pt<Obfs2Factory>(cfg, kObfs2MethodName, factories,
-                                         listeners, scrub_ips);
-  dispatch_loop |= init_pt<ScrambleSuitFactory>(cfg, kScrambleSuitMethodName,
+  dispatch_loop |= init_pt<Obfs3Factory>(cfg, state_dir, kObfs3MethodName,
+                                         factories, listeners, scrub_ips);
+  dispatch_loop |= init_pt<Obfs2Factory>(cfg, state_dir, kObfs2MethodName,
+                                         factories, listeners, scrub_ips);
+  dispatch_loop |= init_pt<ScrambleSuitFactory>(cfg, state_dir,
+                                                kScrambleSuitMethodName,
                                                 factories, listeners,
                                                 scrub_ips);
 

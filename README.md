@@ -13,7 +13,6 @@ This is a C++11 client implementation of the following protocols:
  * [obfs3](https://gitweb.torproject.org/pluggable-transports/obfsproxy.git/blob/HEAD:/doc/obfs3/obfs3-protocol-spec.txt) - The Threebfuscator
  * [ScrambleSuit](https://github.com/NullHypothesis/scramblesuit/blob/master/doc/scramblesuit-spec.txt) - *EXPERIMENTAL*
    * This requires tor-0.2.5.x or later for Pluggable Transport arguments.
-   * The Session Ticket Handshake is not implemented yet.
 
 By design will only function as a ClientTransportPlugin for Tor.  It does use a
 reasonably complete implementation of the Pluggable Transport spec so when used
@@ -72,7 +71,6 @@ Caveats:
 ### TODO (Patches accepted!)
 
  * A connection timeout.
- * Implement the missing ScrambleSuit features.
 
 ### WON'T DO
 

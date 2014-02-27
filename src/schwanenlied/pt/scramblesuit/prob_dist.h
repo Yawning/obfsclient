@@ -44,6 +44,12 @@ namespace schwanenlied {
 namespace pt {
 namespace scramblesuit {
 
+/**
+ * ScrambleSuit Probability Distribution
+ *
+ * This implements the ScrambleSuit probability distribution based on
+ * the C++11 numerics library std::discrete_distribution class.
+ */
 class ProbDist {
  public:
   /**

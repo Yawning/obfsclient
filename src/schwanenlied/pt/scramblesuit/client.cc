@@ -105,14 +105,43 @@ void Client::on_outgoing_connected() {
   CLOG(DEBUG, kLogger) << "Packet length probabilities: "
                        << packet_len_rng_.to_string();
 
-  // UniformDH handshake
-  uniformdh_handshake_ = ::std::unique_ptr<UniformDHHandshake>(
-      new UniformDHHandshake(shared_secret_));
-  SL_ASSERT(uniformdh_handshake_ != nullptr);
-  if (!uniformdh_handshake_->send_handshake_msg(outgoing_)) {
-    CLOG(WARNING, kLogger) << "Initiator UniformDH handshake failed "
+  // Session Ticket Handshake
+  session_ticket_handshake_ = ::std::unique_ptr<SessionTicketHandshake>(
+      new SessionTicketHandshake(*this,
+                                 server_.state_dir(),
+                                 reinterpret_cast<struct sockaddr*>(&remote_addr_),
+                                 remote_addr_len_));
+  bool done = false;
+  if (session_ticket_handshake_ == nullptr) {
+    CLOG(ERROR, kLogger) << "Failed to allocate Session Ticket Handshake";
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+  } else if (!session_ticket_handshake_->send_handshake_msg(done)) {
+    // Something went horribly wrong and we couldn't send a ticket
+    CLOG(WARNING, kLogger) << "Initiator Session Ticket handshake failed "
                            << "(" << this << ")";
     send_socks5_response(Reply::kGENERAL_FAILURE);
+  } else if (done) {
+    /*
+     * The Session Ticket Handshake 'succeeds' immediately after sending a
+     * ticket, and if it actually fails due to an invalid ticket, the peer
+     * will drop the connection.
+     */
+    CLOG(INFO, kLogger) << "Finished Session Ticket handshake "
+                        << "(" << this << ": " << client_addr_str_ << " <-> "
+                               << remote_addr_str_ << ")";
+    send_socks5_response(Reply::kSUCCEDED);
+  } else {
+    // UniformDH handshake
+    uniformdh_handshake_ = ::std::unique_ptr<UniformDHHandshake>(
+        new UniformDHHandshake(*this, shared_secret_));
+    if (uniformdh_handshake_ == nullptr) {
+      CLOG(ERROR, kLogger) << "Failed to allocate UniformDH Handshake";
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+    } else if (!uniformdh_handshake_->send_handshake_msg()) {
+      CLOG(WARNING, kLogger) << "Initiator UniformDH handshake failed "
+                             << "(" << this << ")";
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+    }
   }
 }
 
@@ -140,22 +169,15 @@ void Client::on_outgoing_data_connecting() {
   // UniformDH handshake
   SL_ASSERT(uniformdh_handshake_ != nullptr);
   bool done = false;
-  if (!uniformdh_handshake_->recv_handshake_msg(outgoing_, done)) {
+  if (!uniformdh_handshake_->recv_handshake_msg(done)) {
     CLOG(WARNING, kLogger) << "UniformDH handshake failed "
                            << "(" << this << ")";
     send_socks5_response(Reply::kGENERAL_FAILURE);
   } else if (done) {
-    // Ok, we have a shared secret now, derive the session keys
-    if (kdf_scramblesuit(uniformdh_handshake_->shared_secret())) {
-      CLOG(INFO, kLogger) << "Finished UniformDH handshake "
-                          << "(" << this << ": " << client_addr_str_ << " <-> "
-                                 << remote_addr_str_ << ")";
-      send_socks5_response(Reply::kSUCCEDED);
-    } else {
-      CLOG(ERROR, kLogger) << "Failed to derive session keys "
-                           << "(" << this << ")";
-      send_socks5_response(Reply::kGENERAL_FAILURE);
-    }
+    CLOG(INFO, kLogger) << "Finished UniformDH handshake "
+                        << "(" << this << ": " << client_addr_str_ << " <-> "
+                               << remote_addr_str_ << ")";
+    send_socks5_response(Reply::kSUCCEDED);
   }
 }
 
@@ -315,7 +337,12 @@ out_error:
           CLOG(DEBUG, kLogger) << "Packet interval probabilities (x100 usec): "
                                << packet_int_rng_.to_string();
           break;
-        case PacketFlags::kNEW_TICKET: // FALLSTHROUGH
+        case PacketFlags::kNEW_TICKET:
+          CLOG(INFO, kLogger) << "Received new Session Ticket, persisting";
+          SL_ASSERT(session_ticket_handshake_ != nullptr);
+          session_ticket_handshake_->on_new_ticket(decode_buf_.data() + kHeaderLength,
+                                                   decode_payload_len_);
+          break;
         default:
           // Just ignore unknown/unsupported frame types
           CLOG(WARNING, kLogger) << "Received unsupported frame type: "

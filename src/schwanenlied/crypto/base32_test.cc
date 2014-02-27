@@ -46,6 +46,9 @@ TEST_F(Base32Test, RFC4648_Test_1) {
   SecureBuffer tmp;
   ASSERT_EQ(sizeof(decoded), Base32::decode(encoded, sizeof(encoded), tmp));
   ASSERT_EQ(0, tmp.compare(SecureBuffer(decoded, sizeof(decoded))));
+
+  auto foo = Base32::encode(decoded, sizeof(decoded));
+  ASSERT_EQ(0, foo.compare(SecureBuffer(encoded, sizeof(encoded))));
 }
 
 TEST_F(Base32Test, RFC4648_Test_2) {
@@ -57,6 +60,9 @@ TEST_F(Base32Test, RFC4648_Test_2) {
   SecureBuffer tmp;
   ASSERT_EQ(sizeof(decoded), Base32::decode(encoded, sizeof(encoded), tmp));
   ASSERT_EQ(0, tmp.compare(SecureBuffer(decoded, sizeof(decoded))));
+
+  auto foo = Base32::encode(decoded, sizeof(decoded));
+  ASSERT_EQ(0, foo.compare(SecureBuffer(encoded, sizeof(encoded))));
 }
 
 TEST_F(Base32Test, RFC4648_Test_3) {
@@ -68,6 +74,9 @@ TEST_F(Base32Test, RFC4648_Test_3) {
   SecureBuffer tmp;
   ASSERT_EQ(sizeof(decoded), Base32::decode(encoded, sizeof(encoded), tmp));
   ASSERT_EQ(0, tmp.compare(SecureBuffer(decoded, sizeof(decoded))));
+
+  auto foo = Base32::encode(decoded, sizeof(decoded));
+  ASSERT_EQ(0, foo.compare(SecureBuffer(encoded, sizeof(encoded))));
 }
 
 TEST_F(Base32Test, RFC4648_Test_4) {
@@ -79,6 +88,9 @@ TEST_F(Base32Test, RFC4648_Test_4) {
   SecureBuffer tmp;
   ASSERT_EQ(sizeof(decoded), Base32::decode(encoded, sizeof(encoded), tmp));
   ASSERT_EQ(0, tmp.compare(SecureBuffer(decoded, sizeof(decoded))));
+
+  auto foo = Base32::encode(decoded, sizeof(decoded));
+  ASSERT_EQ(0, foo.compare(SecureBuffer(encoded, sizeof(encoded))));
 }
 
 TEST_F(Base32Test, RFC4648_Test_5) {
@@ -90,6 +102,9 @@ TEST_F(Base32Test, RFC4648_Test_5) {
   SecureBuffer tmp;
   ASSERT_EQ(sizeof(decoded), Base32::decode(encoded, sizeof(encoded), tmp));
   ASSERT_EQ(0, tmp.compare(SecureBuffer(decoded, sizeof(decoded))));
+
+  auto foo = Base32::encode(decoded, sizeof(decoded));
+  ASSERT_EQ(0, foo.compare(SecureBuffer(encoded, sizeof(encoded))));
 }
 
 TEST_F(Base32Test, RFC4648_Test_6) {
@@ -102,6 +117,9 @@ TEST_F(Base32Test, RFC4648_Test_6) {
   SecureBuffer tmp;
   ASSERT_EQ(sizeof(decoded), Base32::decode(encoded, sizeof(encoded), tmp));
   ASSERT_EQ(0, tmp.compare(SecureBuffer(decoded, sizeof(decoded))));
+
+  auto foo = Base32::encode(decoded, sizeof(decoded));
+  ASSERT_EQ(0, foo.compare(SecureBuffer(encoded, sizeof(encoded))));
 }
 
 } // namespace crypto

@@ -1,7 +1,7 @@
 /**
  * @file    base32.h
  * @author  Yawning Angel (yawning at schwanenlied dot me)
- * @brief   Base32 Decoder
+ * @brief   Base32 Encoder/Decoder
  */
 
 /*
@@ -40,15 +40,27 @@ namespace schwanenlied {
 namespace crypto {
 
 /**
- * A Base32 decoder
+ * Base32 Encoder/Decoder
  *
- * A simple Base32 decoder based off the "Public Domain" bitpedia Java code
- * (Project died, but the source is available
+ * A simple Base32 encoder/decoder based off the "Public Domain" bitpedia Java
+ * code (Project died, but the source is available
  * [here](http://bitcollider.cvs.sourceforge.net/viewvc/bitcollider/jbitcollider/plugins/org.bitpedia.collider.core/src/org/bitpedia/util/Base32.java?revision=1.2&view=markup)).
- * The original implementation uses a lookup table, but doing the alphabet
+ *
+ * The original implementations uses lookup tables, but doing the alphabet
  * calcuation is easy so this implementation does that instead.
  */
 namespace Base32 {
+
+/**
+ * Encode a Base32 buffer (No padding)
+ *
+ * @param[in] buf   The buffer to encode
+ * @param[in] len   The length of the buffer to encode
+ *
+ * @returns The Base32 encoded buffer
+ */
+SecureBuffer encode(const uint8_t* buf,
+                    const size_t len);
 
 /**
  * Decode a Base32 buffer
@@ -62,6 +74,7 @@ namespace Base32 {
 size_t decode(const uint8_t* buf,
               const size_t len,
               SecureBuffer& dst);
+
 } // namespace Base32
 
 } // namespace crpto

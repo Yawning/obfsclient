@@ -1,7 +1,7 @@
 /**
  * @file    base32.cc
  * @author  Yawning Angel (yawning at schwanenlied dot me)
- * @brief   Base32 Decoder (IMPLEMENTATION)
+ * @brief   Base32 Encoder/Decoder (IMPLEMENTATION)
  */
 
 /*
@@ -37,6 +37,57 @@ namespace schwanenlied {
 namespace crypto {
 
 namespace Base32 {
+
+SecureBuffer encode(const uint8_t* buf,
+                    const size_t len) {
+  SecureBuffer ret;
+  size_t i = 0;
+  size_t index = 0;
+  uint8_t digit = 0;
+  uint8_t nextByte = 0;
+
+  auto conv_char = [](const uint8_t i) -> uint8_t {
+    if (i <= 25)
+      return 'A' + i;
+    else if (i <= 31)
+      return '2' + (i - 26);
+    else
+      return 0xff;
+  };
+
+  ret.reserve((len + 7) * 8 / 5);
+  while (i < len) {
+    uint8_t currByte = buf[i];
+
+    // Is the current digit going to span a byte boundary?
+    if (index > 3) {
+      if ((i + 1) < len)
+        nextByte = buf[i + 1];
+      else
+        nextByte = 0;
+
+      digit = currByte & (0xff >> index);
+      index = (index + 5) & 0x07;
+      digit <<= index;
+      digit |= nextByte >> (8 - index);
+      i++;
+    } else {
+      digit = (currByte >> (8 - (index + 5))) & 0x1f;
+      index = (index + 5) & 0x07;
+      if (index == 0)
+        i++;
+    }
+
+    ret.push_back(conv_char(digit));
+  }
+
+  // Append padding
+  if ((ret.size() & 0x07) > 0)
+    for (int i = 8 - (ret.size() & 0x07); i > 0; i--)
+      ret.push_back('=');
+
+  return ret;
+}
 
 size_t decode(const uint8_t* buf,
               const size_t len,

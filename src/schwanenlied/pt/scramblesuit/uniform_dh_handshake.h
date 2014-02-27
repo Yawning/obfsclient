@@ -57,10 +57,12 @@ class UniformDHHandshake {
   /**
    * Construct a new UniformDHHandshake instance
    *
+   * @param[in] client        The Client instance
    * @param[in] shared_secret The bridge secret (k_B)
    */
-  UniformDHHandshake(const crypto::SecureBuffer shared_secret) :
-      has_shared_secret_(false),
+  UniformDHHandshake(Client& client,
+                     const crypto::SecureBuffer shared_secret) :
+      client_(client),
       shared_secret_(kSharedSecretLength, 0),
       hmac_(shared_secret) {}
 
@@ -70,12 +72,10 @@ class UniformDHHandshake {
   /**
    * Send the outgoing side of the handshake
    *
-   * @param[in] sink  The bufferevent to use when sending data
-   *
    * @returns true  - Success
    * @returns false - Failure
    */
-  bool send_handshake_msg(struct bufferevent* sink);
+  bool send_handshake_msg();
 
   /**
    * Recieve the handshake response from a bridge
@@ -85,21 +85,13 @@ class UniformDHHandshake {
    * secret is available only when this routine returns true *and* is_finished
    * is true. 
    *
-   * @param[in] source        The bufferevent to use when reading data
    * @param[out] is_finished  Did the handshake complete?
    *
    * @returns true  - Success
    * @returns false - Failure
    */
-  bool recv_handshake_msg(struct bufferevent* source,
-                          bool& is_finished);
+  bool recv_handshake_msg(bool& is_finished);
   /** @} */
-
-  /** Obtain the shared secret derived in recv_handshake_msg() */
-  const crypto::SecureBuffer shared_secret() const {
-    SL_ASSERT(has_shared_secret_ == true);
-    return shared_secret_;
-  }
 
  private:
   UniformDHHandshake() = delete;
@@ -119,6 +111,8 @@ class UniformDHHandshake {
   /** Generate pad length suitable for P_C */
   uint16_t gen_padlen() const;
 
+  /** The Client instance that the handshake is for */
+  Client& client_;
   /** The remote peer's public UniformDH key */
   ::std::unique_ptr<crypto::SecureBuffer> remote_public_key_;
   /** The derived M_S */
@@ -128,9 +122,7 @@ class UniformDHHandshake {
   /** The number of hours since the epoch */
   ::std::string epoch_hour_;
 
-  bool has_shared_secret_;  /**< Is a valid shared secret present? */
   crypto::SecureBuffer shared_secret_;  /**< The shared secret */
-
   crypto::UniformDH uniform_dh_;  /**< The UniformDH instance */
   crypto::HmacSha256 hmac_;       /**< The HMAC-SHA256-128 instance */
 };

@@ -43,20 +43,20 @@
 #include "schwanenlied/crypto/aes.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
 #include "schwanenlied/pt/scramblesuit/prob_dist.h"
+#include "schwanenlied/pt/scramblesuit/session_ticket_handshake.h"
 #include "schwanenlied/pt/scramblesuit/uniform_dh_handshake.h"
 
 namespace schwanenlied {
 namespace pt {
 
-/**
- * ScrambleSuit
- *
- * This implements a wire compatible ScrambleSuit client using Socks5Server.
- *
- * @todo Support the Session Ticket handshake
- */
+/** ScrambleSuit */
 namespace scramblesuit {
 
+/**
+ * ScrambleSuit Client
+ *
+ * This implements a wire compatible ScrambleSuit client using Socks5Server.
+ */
 class Client : public Socks5Server::Session {
  public:
   /** Client factory */
@@ -181,6 +181,8 @@ class Client : public Socks5Server::Session {
   crypto::SecureBuffer shared_secret_;
   /** The UniformDHHandshake instance */
   ::std::unique_ptr<UniformDHHandshake> uniformdh_handshake_;
+  /** The SessionTicketHandshake instance */
+  ::std::unique_ptr<SessionTicketHandshake> session_ticket_handshake_;
   /** @} */
 
   /** @{ */
@@ -210,6 +212,11 @@ class Client : public Socks5Server::Session {
   ProbDist packet_len_rng_;     /**< Packet length morpher */
   ProbDist packet_int_rng_;     /**< Packet interval morpher */
   struct event* iat_timer_ev_;  /**< Packet interval TX event */
+  /** @} */
+
+  /** @{ */
+  friend SessionTicketHandshake;
+  friend UniformDHHandshake;
   /** @} */
 };
 
