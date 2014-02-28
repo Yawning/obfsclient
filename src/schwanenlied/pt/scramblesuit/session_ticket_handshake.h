@@ -236,7 +236,7 @@ class SessionTicketHandshake {
   TicketStore& store_;              /**< Ticket store */
   const struct sockaddr* addr_;     /**< Remote peer address */
   const socklen_t addr_len_;        /**< Length of addr_ */
-  crypto::RandOpenSSL rand_;      /**< CSPRNG */
+  crypto::RandOpenSSL rand_;        /**< CSPRNG */
   ::std::uniform_int_distribution<uint32_t> pad_dist_; /**< Padding distribution */
   /** @} */
 };

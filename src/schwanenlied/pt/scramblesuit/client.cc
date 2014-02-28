@@ -51,7 +51,9 @@ constexpr char Client::kLogger[];
 constexpr size_t Client::kPrngSeedLength;
 constexpr size_t Client::kMaxFrameLength;
 constexpr size_t Client::kMaxPayloadLength;
+#ifdef ENABLE_SCRAMBLESUIT_IAT
 constexpr uint32_t Client::kMaxPacketDelay;
+#endif
 
 bool Client::on_client_authenticate(const uint8_t* uname,
                                     const uint8_t ulen,
@@ -59,13 +61,13 @@ bool Client::on_client_authenticate(const uint8_t* uname,
                                     const uint8_t plen) {
   static const ::std::string passwd_prefix("password=");
   static constexpr size_t passwd_len_base32 = 32;
-  if ((uint16_t)ulen + plen == 0) {
+  if (static_cast<uint16_t>(ulen) + plen == 0) {
     CLOG(WARNING, kLogger) << "Expected a bridge password, got nothing "
                            << "(" << this << ")";
     return false;
   }
 
-  ::std::string args((size_t)ulen + plen, 0);
+  ::std::string args(static_cast<size_t>(ulen) + plen, 0);
   if (uname != nullptr)
     ::std::memcpy(&args[0], uname, ulen);
   if (passwd != nullptr)
@@ -374,14 +376,12 @@ void Client::on_outgoing_data() {
           packet_len_rng_.reset(decode_buf_.data() + kHeaderLength,
                                 decode_payload_len_, kHeaderLength,
                                 kMaxFrameLength);
+          CLOG(DEBUG, kLogger) << "Packet length probabilities: "
+                               << packet_len_rng_.to_string();
 #ifdef ENABLE_SCRAMBLESUIT_IAT
           packet_int_rng_.reset(decode_buf_.data() + kHeaderLength,
                                 decode_payload_len_, 0,
                                 kMaxPacketDelay);
-#endif
-          CLOG(DEBUG, kLogger) << "Packet length probabilities: "
-                               << packet_len_rng_.to_string();
-#ifdef ENABLE_SCRAMBLESUIT_IAT
           CLOG(DEBUG, kLogger) << "Packet interval probabilities (x100 usec): "
                                << packet_int_rng_.to_string();
 #endif
@@ -575,11 +575,10 @@ void Client::on_iat_transmit(const bool send_all) {
         return;
       }
     }
-
-  } while (send_all && len  > 0);
+  } while (send_all && len > 0);
 
 #ifdef ENABLE_SCRAMBLESUIT_IAT
-  if (::evbuffer_get_length(buf) > 0) {
+  if (len > 0) {
     if (!schedule_iat_transmit()) {
       server_.close_session(this);
       return;

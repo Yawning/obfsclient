@@ -80,15 +80,15 @@ class Client : public Socks5Server::Session {
       Session(server, base, sock, addr, true, scrub_addrs),
       logger_(::el::Loggers::getLogger(kLogger)),
       handshake_(HandshakeMethod::kINVALID),
+      packet_len_rng_(kHeaderLength, kMaxFrameLength),
+#ifdef ENABLE_SCRAMBLESUIT_IAT
+      packet_int_rng_(0, kMaxPacketDelay),
+      iat_timer_ev_(nullptr),
+#endif
       decode_state_(FrameDecodeState::kREAD_HEADER),
       decode_buf_len_(0),
-#ifdef ENABLE_SCRAMBLESUIT_IAT
-      packet_len_rng_(kHeaderLength, kMaxFrameLength),
-      packet_int_rng_(0, kMaxPacketDelay),
-      iat_timer_ev_(nullptr) {}
-#else
-      packet_len_rng_(kHeaderLength, kMaxFrameLength) {}
-#endif
+      decode_total_len_(0),
+      decode_payload_len_(0) {}
 
   ~Client() {
 #ifdef ENABLE_SCRAMBLESUIT_IAT
@@ -135,8 +135,10 @@ class Client : public Socks5Server::Session {
   static constexpr size_t kMaxFrameLength = 1448;
   /** ScrambleSuit frame max payload length */
   static constexpr size_t kMaxPayloadLength = kMaxFrameLength - kHeaderLength;
+#ifdef ENABLE_SCRAMBLESUIT_IAT
   /** ScrambleSuit max IAT obfsucation delay (multiples of 100 usec) */
   static constexpr uint32_t kMaxPacketDelay = 100;
+#endif
   /** @} */
 
   /** ScrambleSuit Handshake methods */
@@ -215,6 +217,14 @@ class Client : public Socks5Server::Session {
   /** @} */
 
   /** @{ */
+  ProbDist packet_len_rng_;     /**< Packet length morpher */
+#ifdef ENABLE_SCRAMBLESUIT_IAT
+  ProbDist packet_int_rng_;     /**< Packet interval morpher */
+  struct event* iat_timer_ev_;  /**< Packet interval TX event */
+#endif
+  /** @} */
+
+  /** @{ */
   /** Frame decode state */
   enum class FrameDecodeState {
     kREAD_HEADER,   /**< Reading the header */
@@ -228,14 +238,6 @@ class Client : public Socks5Server::Session {
   uint16_t decode_total_len_;
   /** The total payload in the frame being decoded */
   uint16_t decode_payload_len_;
-  /** @} */
-
-  /** @{ */
-  ProbDist packet_len_rng_;     /**< Packet length morpher */
-#ifdef ENABLE_SCRAMBLESUIT_IAT
-  ProbDist packet_int_rng_;     /**< Packet interval morpher */
-  struct event* iat_timer_ev_;  /**< Packet interval TX event */
-#endif
   /** @} */
 
   /** @{ */
