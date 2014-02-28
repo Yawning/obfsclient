@@ -574,7 +574,7 @@ void Socks5Server::Session::incoming_read_request_cb() {
 void Socks5Server::Session::connect_timeout_cb() {
   SL_ASSERT(state_ == State::kCONNECTING);
   CLOG(WARNING, kLogger) << "Session handshake timeout (" << this << ")";
-  server_.close_session(this);
+  send_socks5_response(Reply::kTTL_EXPIRED);
 }
 
 void Socks5Server::Session::incoming_write_cb() {
