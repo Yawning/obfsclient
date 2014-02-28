@@ -201,6 +201,11 @@ bool Socks5Server::Session::send_socks5_response(const Reply reply) {
   uint8_t resp[22] = { 0 };
   size_t resp_len = 0;
 
+  // Disarm the timer
+  if (connect_timer_ev_ != nullptr)
+    if (evtimer_pending(connect_timer_ev_, nullptr))
+      evtimer_del(connect_timer_ev_);
+
   /*
    * +----+-----+-------+------+----------+----------+
    * |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
@@ -251,11 +256,6 @@ bool Socks5Server::Session::send_socks5_response(const Reply reply) {
         resp[1] = Reply::kGENERAL_FAILURE;
         goto error_reply;
       }
-
-      // Disarm the timer
-      SL_ASSERT(connect_timer_ev_ != nullptr);
-      if (evtimer_pending(connect_timer_ev_, nullptr))
-        evtimer_del(connect_timer_ev_);
 
       state_ = State::kESTABLISHED;
     } else {
@@ -314,7 +314,7 @@ void Socks5Server::Session::incoming_read_cb() {
     on_incoming_data();
     break;
   default:
-    SL_ABORT();
+    SL_ABORT("Invalid state");
   }
 }
 
@@ -702,7 +702,7 @@ void Socks5Server::Session::outgoing_read_cb() {
     on_outgoing_data();
     break;
   default:
-    SL_ABORT();
+    SL_ABORT("Invalid state");
   }
 }
 
