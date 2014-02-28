@@ -172,13 +172,15 @@ void Client::on_outgoing_data_connecting() {
 
   if (handshake_ == HandshakeMethod::kSESSION_TICKET) {
     SL_ASSERT(session_ticket_handshake_ != nullptr);
+    SL_ASSERT(uniformdh_handshake_ == nullptr);
 
     CLOG(INFO, kLogger) << "Finished SessionTicket handshake "
                         << "(" << this << ": " << client_addr_str_ << " <-> "
                                << remote_addr_str_ << ")";
     /*
      * Ok, the peer sent what I imagine to be a frame, the session is probably
-     * established.
+     * established.  If send_socks5_response fails, it will clean up the
+     * session.
      */
     if (send_socks5_response(Reply::kSUCCEDED)) {
       /*
@@ -197,6 +199,9 @@ void Client::on_outgoing_data_connecting() {
                              << "(" << this << ")";
       send_socks5_response(Reply::kGENERAL_FAILURE);
     } else if (done) {
+      // Free up the UniformDH keypair (dtor won't be called for a while)
+      uniformdh_handshake_.reset(nullptr);
+
       CLOG(INFO, kLogger) << "Finished UniformDH handshake "
                           << "(" << this << ": " << client_addr_str_ << " <-> "
                                  << remote_addr_str_ << ")";
@@ -225,7 +230,6 @@ void Client::on_outgoing_data() {
                                                                kHeaderLength)) {
         CLOG(ERROR, kLogger) << "Failed to read frame header "
                              << "(" << this << ")";
-out_error:
         server_.close_session(this);
         return;
       }
@@ -236,13 +240,15 @@ out_error:
       if (!responder_hmac_.init()) {
         CLOG(ERROR, kLogger) << "Failed to init RX frame MAC "
                              << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
       if (!responder_hmac_.update(decode_buf_.data() + kDigestLength,
                                   kHeaderLength - kDigestLength)) {
         CLOG(ERROR, kLogger) << "Failed to MAC RX frame header "
                              << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
 
       // Decrypt the header
@@ -251,7 +257,8 @@ out_error:
                                   decode_buf_.data() + kDigestLength)) {
         CLOG(ERROR, kLogger) << "Failed to decrypt frame header "
                              << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
 
       // Validate that the lengths are sane
@@ -260,18 +267,21 @@ out_error:
       if (decode_total_len_ > kMaxPayloadLength) {
         CLOG(WARNING, kLogger) << "Total length oversized: " << decode_total_len_ << " "
                                << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
       if (decode_payload_len_ > kMaxPayloadLength) {
         CLOG(WARNING, kLogger) << "Payload length oversized: " << decode_payload_len_ << " "
                                << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
       if (decode_total_len_ < decode_payload_len_) {
         CLOG(WARNING, kLogger) << "Payload longer than frame: "
                                << decode_total_len_ << " < " << decode_payload_len_ << " "
                                << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
 
       decode_state_ = FrameDecodeState::kREAD_PAYLOAD;
@@ -291,7 +301,8 @@ out_error:
                                         decode_buf_len_, to_process)) {
       CLOG(ERROR, kLogger) << "Failed to read frame payload "
                            << "(" << this << ")";
-      goto out_error;
+      server_.close_session(this);
+      return;
     }
 
     // MAC the encrypted payload
@@ -299,7 +310,8 @@ out_error:
                                 to_process)) {
       CLOG(ERROR, kLogger) << "Failed to MAC RX frame payload "
                            << "(" << this << ")";
-      goto out_error;
+      server_.close_session(this);
+      return;
     }
     decode_buf_len_ += to_process;
     len -= to_process;
@@ -310,12 +322,14 @@ out_error:
       if (!responder_hmac_.final(digest.data(), digest.size())) {
         CLOG(ERROR, kLogger) << "Failed to finalize RX frame MAC "
                              << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
       if (!crypto::memequals(decode_buf_.data(), digest.data(), digest.size())) {
         CLOG(ERROR, kLogger) << "RX frame MAC mismatch "
                              << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
 
       // Decrypt
@@ -324,7 +338,8 @@ out_error:
                                   decode_buf_.data() + kHeaderLength)) {
         CLOG(ERROR, kLogger) << "Failed to decrypt frame payload "
                              << "(" << this << ")";
-        goto out_error;
+        server_.close_session(this);
+        return;
       }
 
       CLOG(DEBUG, kLogger) << "Received " << kHeaderLength << " + "
@@ -341,7 +356,8 @@ out_error:
                                        kHeaderLength, decode_payload_len_)) {
             CLOG(ERROR, kLogger) << "Failed to send remote payload "
                                  << "(" << this << ")";
-            goto out_error;
+            server_.close_session(this);
+            return;
           }
           break;
         case PacketFlags::kPRNG_SEED:
@@ -491,7 +507,6 @@ void Client::on_iat_transmit() {
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
-out_error:
     server_.close_session(this);
     return;
   }
@@ -516,29 +531,41 @@ out_error:
 
   if (pad_len >= kHeaderLength && pad_len + frame_payload_len <= kMaxPayloadLength) {
     // XXX: In theory, it's possible to incrementally send padding as well?
-    if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength))
-      goto out_error;
+    if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength)) {
+      server_.close_session(this);
+      return;
+    }
     pad_len = 0;
-  } else if (!send_outgoing_frame(p, frame_payload_len, 0))
-    goto out_error;
+  } else if (!send_outgoing_frame(p, frame_payload_len, 0)) {
+    server_.close_session(this);
+    return;
+  }
 
   // Remove the processed payload from the rx queue
   ::evbuffer_drain(buf, frame_payload_len);
 
   // Send remaining padding if any exists
   if (pad_len > kHeaderLength) {
-    if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength))
-      goto out_error;
+    if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength)) {
+      server_.close_session(this);
+      return;
+    }
   } else if (pad_len > 0) {
-    if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength))
-      goto out_error;
-    if (!send_outgoing_frame(nullptr, 0, pad_len))
-      goto out_error;
+    if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength)) {
+      server_.close_session(this);
+      return;
+    }
+    if (!send_outgoing_frame(nullptr, 0, pad_len)) {
+      server_.close_session(this);
+      return;
+    }
   }
 
   if (::evbuffer_get_length(buf) > 0) {
-    if (!schedule_iat_transmit())
-      goto out_error;
+    if (!schedule_iat_transmit()) {
+      server_.close_session(this);
+      return;
+    }
   } else
     CLOG(DEBUG, kLogger) << "IAT TX buffer drained";
 }

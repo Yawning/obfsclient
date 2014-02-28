@@ -63,7 +63,6 @@ void Client::on_outgoing_connected() {
   if (1 != ::RAND_bytes(&init_seed_[0], init_seed_.size())) {
     CLOG(ERROR, kLogger) << "Failed to derive INIT_SEED "
                          << "(" << this << ")";
-out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -80,7 +79,8 @@ out_error:
            init_seed_.size(), init_pad_key)) {
     CLOG(ERROR, kLogger) << "Failed to derive INIT_PAD_KEY "
                          << "(" << this << ")";
-    goto out_error;
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return;
   }
   if (!initiator_aes_.set_state(init_pad_key.substr(0, crypto::kAes128KeyLength),
                                 nullptr, 0,
@@ -88,7 +88,8 @@ out_error:
                                 init_pad_key.size() - crypto::kAes128KeyLength)) {
     CLOG(ERROR, kLogger) << "Failed to set INIT_PAD_KEY "
                          << "(" << this << ")";
-    goto out_error;
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return;
   }
 
   /*
@@ -110,21 +111,24 @@ out_error:
                               reinterpret_cast<uint8_t*>(pad_hdr.data()))) {
     CLOG(ERROR, kLogger) << "Failed to encrypt header "
                          << "(" << this << ")";
-    goto out_error;
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return;
   }
 
   // Send INIT_SEED
   if (0 != ::bufferevent_write(outgoing_, init_seed_.data(), init_seed_.size())) {
     CLOG(ERROR, kLogger) << "Failed to send INIT_SEED "
                          << "(" << this << ")";
-    goto out_error;
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return;
   }
 
   // Send the header
   if (0 != ::bufferevent_write(outgoing_, pad_hdr.data(), pad_hdr_sz)) {
     CLOG(ERROR, kLogger) << "Failed to send header "
                          << "(" << this << ")";
-    goto out_error;
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return;
   }
 
   // Generate and send the random data
@@ -135,13 +139,15 @@ out_error:
     if (!initiator_aes_.process(padding, padlen, padding)) {
       CLOG(ERROR, kLogger) << "Failed to encrypt padding "
                            << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
 
     if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
       CLOG(ERROR, kLogger) << "Failed to send padding "
                            << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
   }
 
@@ -164,19 +170,20 @@ void Client::on_incoming_data() {
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
-out_error:
     server_.close_session(this);
     return;
   }
   if (!initiator_aes_.process(p, len, p)) {
     CLOG(ERROR, kLogger) << "Failed to encrypt client payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   if (::bufferevent_write(outgoing_, p, len) != 0) {
     CLOG(ERROR, kLogger) << "Failed to send client payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   ::evbuffer_drain(buf, len);
 
@@ -205,7 +212,6 @@ void Client::on_outgoing_data_connecting() {
                                                            resp_seed_.size())) {
       CLOG(ERROR, kLogger) << "Failed to read RESP_SEED "
                            << "(" << this << ")";
-out_error:
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
@@ -214,7 +220,8 @@ out_error:
            resp_seed_.size(), resp_pad_key)) {
       CLOG(ERROR, kLogger) << "Failed to derive RESP_PAD_KEY "
                            << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
     if (!responder_aes_.set_state(resp_pad_key.substr(0, crypto::kAes128KeyLength),
                                   nullptr, 0,
@@ -222,39 +229,47 @@ out_error:
                                   resp_pad_key.size() - crypto::kAes128KeyLength)) {
       CLOG(ERROR, kLogger) << "Failed to set RESP_PAD_KEY "
                            << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
 
     // Validate the header and obtain padlen
     ::std::array<uint32_t, 2> pad_hdr;
     constexpr size_t pad_hdr_sz = pad_hdr.size() * sizeof(uint32_t);
-    if (sizeof(uint32_t) * 2 != ::evbuffer_remove(buf, pad_hdr.data(), pad_hdr_sz))
-        goto out_error;
+    if (sizeof(uint32_t) * 2 != ::evbuffer_remove(buf, pad_hdr.data(),
+                                                  pad_hdr_sz)) {
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
+    }
     if (!responder_aes_.process(reinterpret_cast<uint8_t*>(pad_hdr.data()),
                                 pad_hdr_sz,
                                 reinterpret_cast<uint8_t*>(pad_hdr.data()))) {
       CLOG(ERROR, kLogger) << "Failed to decrypt header "
                            << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
     if (ntohl(pad_hdr.at(0)) != kMagicValue) {
       CLOG(WARNING, kLogger) << "Received invalid magic value from peer "
                              << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
     resp_pad_len_ = ntohl(pad_hdr.at(1));
     if (resp_pad_len_ > kMaxPadding) {
       CLOG(WARNING, kLogger) << "Peer claims to have sent too much padding: "
                              << resp_pad_len_ << " "
                              << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
 
     // Derive the actual keys
     if (!kdf_obfs2()) {
       CLOG(ERROR, kLogger) << "Failed to derive session keys "
                            << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
 
     received_seed_hdr_ = true;
@@ -292,19 +307,20 @@ void Client::on_outgoing_data() {
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
-out_error:
     server_.close_session(this);
     return;
   }
   if (!responder_aes_.process(p, len, p)) {
     CLOG(ERROR, kLogger) << "Failed to decrypt remote payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   if (::bufferevent_write(incoming_, p, len) != 0) {
     CLOG(ERROR, kLogger) << "Failed to send remote payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   ::evbuffer_drain(buf, len);
 

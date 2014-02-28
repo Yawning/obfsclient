@@ -241,13 +241,14 @@ bool UniformDHHandshake::recv_handshake_msg(bool& is_finished) {
   // Derive k_t
   crypto::Sha256 sha;
   const auto sekrit = uniform_dh_.shared_secret();
-  if (!sha.digest(sekrit.data(), sekrit.size(), &shared_secret_[0],
-                  shared_secret_.size()))
+  crypto::SecureBuffer k_t(kSharedSecretLength, 0);
+  if (!sha.digest(sekrit.data(), sekrit.size(), &k_t[0],
+                  k_t.size()))
     return false;
 
   // The the the that's all folks!
   is_finished = true;
-  return client_.kdf_scramblesuit(shared_secret_);
+  return client_.kdf_scramblesuit(k_t);
 }
 
 } // namespace scramblesuit

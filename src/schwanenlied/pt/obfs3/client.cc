@@ -56,7 +56,6 @@ void Client::on_outgoing_connected() {
                                public_key.size())) {
     CLOG(ERROR, kLogger) << "Failed to send public key "
                          << "(" << this << ")";
-out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -70,7 +69,8 @@ out_error:
     if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
       CLOG(ERROR, kLogger) << "Failed to send key padding "
                            << "(" << this << ")";
-      goto out_error;
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
     }
   }
 
@@ -117,19 +117,20 @@ void Client::on_incoming_data() {
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
-out_error:
     server_.close_session(this);
     return;
   }
   if (!initiator_aes_.process(p, len, p)) {
     CLOG(ERROR, kLogger) << "Failed to encrypt client payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   if (::bufferevent_write(outgoing_, p, len) != 0) {
     CLOG(ERROR, kLogger) << "Failed to send client payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   ::evbuffer_drain(buf, len);
 
@@ -151,21 +152,22 @@ void Client::on_outgoing_data_connecting() {
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup public key "
                          << "(" << this << ")";
-out_error:
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
   if (!uniform_dh_.compute_key(p, crypto::UniformDH::kKeyLength)) {
     CLOG(WARNING, kLogger) << "UniformDH key exchange failed "
                            << "(" << this << ")";
-    goto out_error;
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return;
   }
 
   // Apply the KDF and initialize the crypto
   if (!kdf_obfs3(uniform_dh_.shared_secret())) {
     CLOG(ERROR, kLogger) << "Failed to derive session keys "
                          << "(" << this << ")";
-    goto out_error;
+    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return;
   }
   ::evbuffer_drain(buf, crypto::UniformDH::kKeyLength);
 
@@ -211,19 +213,20 @@ void Client::on_outgoing_data() {
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
-out_error:
     server_.close_session(this);
     return;
   }
   if (!responder_aes_.process(p, len, p)) {
     CLOG(ERROR, kLogger) << "Failed to decrypt remote payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   if (::bufferevent_write(incoming_, p, len) != 0) {
     CLOG(ERROR, kLogger) << "Failed to send remote payload "
                          << "(" << this << ")";
-    goto out_error;
+    server_.close_session(this);
+    return;
   }
   ::evbuffer_drain(buf, len);
 

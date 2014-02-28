@@ -338,7 +338,6 @@ void Socks5Server::Session::incoming_read_methods_cb() {
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";
-out_free:
     server_.close_session(this);
     return;
   }
@@ -346,7 +345,8 @@ out_free:
   if (p[0] != kSocksVersion) {
     CLOG(WARNING, kLogger) << "Invalid SOCKS protocol version: " << p[0] << " "
                            << "(" << this << ")";
-    goto out_free;
+    server_.close_session(this);
+    return;
   }
   const uint8_t nmethods = p[1];
   if (len < static_cast<size_t>(2 + nmethods))
@@ -372,7 +372,8 @@ out_free:
     else {
       CLOG(WARNING, kLogger) << "Failed to negotiate compatible auth "
                              << "(" << this << ")";
-      goto out_free;
+      server_.close_session(this);
+      return;
     }
   } else if (can_none)
     auth_method_ = AuthMethod::kNONE_REQUIRED;
@@ -384,7 +385,8 @@ out_free:
   if (0 != ::bufferevent_write(incoming_, method, sizeof(method))) {
     CLOG(ERROR, kLogger) << "Failed to write auth method, closing "
                          << "(" << this << ")";
-    goto out_free;
+    server_.close_session(this);
+    return;
   }
 
   ::evbuffer_drain(buf, 2 + nmethods);

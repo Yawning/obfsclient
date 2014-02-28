@@ -51,9 +51,6 @@ class Client;
  */
 class UniformDHHandshake {
  public:
-  /** The length of the resultant shared secret */
-  static constexpr size_t kSharedSecretLength = crypto::Sha256::kDigestLength;
-
   /**
    * Construct a new UniformDHHandshake instance
    *
@@ -61,9 +58,8 @@ class UniformDHHandshake {
    * @param[in] shared_secret The bridge secret (k_B)
    */
   UniformDHHandshake(Client& client,
-                     const crypto::SecureBuffer shared_secret) :
+                     const crypto::SecureBuffer& shared_secret) :
       client_(client),
-      shared_secret_(kSharedSecretLength, 0),
       hmac_(shared_secret) {}
 
   ~UniformDHHandshake() = default;
@@ -98,6 +94,8 @@ class UniformDHHandshake {
   UniformDHHandshake(const UniformDHHandshake&) = delete;
   void operator=(const UniformDHHandshake&) = delete;
 
+  /** The length of the resultant shared secret */
+  static constexpr size_t kSharedSecretLength = crypto::Sha256::kDigestLength;
   /** The UniformDH public key length (X, Y) */
   static constexpr size_t kKeyLength = crypto::UniformDH::kKeyLength;
   /** The HMAC-SHA-256 digest length (M_C, M_S, MAC) */
@@ -122,7 +120,6 @@ class UniformDHHandshake {
   /** The number of hours since the epoch */
   ::std::string epoch_hour_;
 
-  crypto::SecureBuffer shared_secret_;  /**< The shared secret */
   crypto::UniformDH uniform_dh_;  /**< The UniformDH instance */
   crypto::HmacSha256 hmac_;       /**< The HMAC-SHA256-128 instance */
 };
