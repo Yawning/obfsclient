@@ -99,9 +99,11 @@ bool SessionTicketHandshake::send_handshake_msg(bool& is_done) {
 
   // Generate P_C
   ::std::array<uint8_t, kMaxPadding> p_c;
-  const auto padlen = gen_padlen();
+  const auto padlen = pad_dist_(rand_);
+  SL_ASSERT(padlen <= kMaxPadding);
   if (padlen > 0) {
-    ::evutil_secure_rng_get_bytes(p_c.data(), padlen);
+    if (!rand_.get_bytes(p_c.data(), padlen))
+      return false;
     if (!client_.initiator_hmac_.update(p_c.data(), padlen))
       return false;
   }
@@ -135,19 +137,6 @@ bool SessionTicketHandshake::send_handshake_msg(bool& is_done) {
   is_done = true;
 
   return true;
-}
-
-uint16_t SessionTicketHandshake::gen_padlen() const {
-  uint16_t ret;
-
-  do {
-    ::evutil_secure_rng_get_bytes(&ret, sizeof(ret));
-    ret &= 0x5ff;
-  } while (ret > kMaxPadding);
-
-  SL_ASSERT(ret <= kMaxPadding);
-
-  return ret;
 }
 
 ::std::string Ticket::to_string() const {

@@ -34,10 +34,13 @@
 #ifndef SCHWANENLIED_PT_OBFS3_CLIENT_H__
 #define SCHWANENLIED_PT_OBFS3_CLIENT_H__
 
+#include <random>
+
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
 #include "schwanenlied/crypto/aes.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
+#include "schwanenlied/crypto/rand_openssl.h"
 #include "schwanenlied/crypto/uniform_dh.h"
 
 namespace schwanenlied {
@@ -79,7 +82,8 @@ class Client : public Socks5Server::Session {
       sent_magic_(false),
       received_magic_(false),
       initiator_magic_(crypto::HmacSha256::kDigestLength, 0),
-      responder_magic_(crypto::HmacSha256::kDigestLength, 0) {}
+      responder_magic_(crypto::HmacSha256::kDigestLength, 0),
+      pad_dist_(0, kMaxPadding / 2) {}
 
   ~Client() = default;
 
@@ -110,9 +114,6 @@ class Client : public Socks5Server::Session {
    * @returns false - Failure
    */
   bool kdf_obfs3(const crypto::SecureBuffer& shared_secret);
-
-  /** Generate PADLEN (or PADLEN2) per the obfs3 spec */
-  uint16_t gen_padlen() const;
   /** @} */
 
   /** @{ */
@@ -123,6 +124,7 @@ class Client : public Socks5Server::Session {
   crypto::UniformDH uniform_dh_;    /**< The UniformDH keypair */
   crypto::Aes128Ctr initiator_aes_; /**< E(INIT_KEY, DATA) */
   crypto::Aes128Ctr responder_aes_; /**< E(RESP_KEY, DATA) */
+  crypto::RandOpenSSL rand_;        /**< CSPRNG */
   /** @} */
 
   /** @{ */
@@ -130,6 +132,7 @@ class Client : public Socks5Server::Session {
   bool received_magic_; /**< Received responder_magic_ from the peer? */
   crypto::SecureBuffer initiator_magic_; /**< HMAC(SHARED_SECRET, "Initiator magic") */
   crypto::SecureBuffer responder_magic_; /**< HMAC(SHARED_SECRET, "Responder magic") */
+  ::std::uniform_int_distribution<uint32_t> pad_dist_;  /** Padding distribution */
   /** @} */
 };
 

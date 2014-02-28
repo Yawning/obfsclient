@@ -37,9 +37,11 @@
 #include <netinet/in.h>
 
 #include <map>
+#include <random>
 #include <string>
 
 #include "schwanenlied/common.h"
+#include "schwanenlied/crypto/rand_openssl.h"
 #include "schwanenlied/crypto/utils.h"
 
 namespace schwanenlied {
@@ -192,7 +194,8 @@ class SessionTicketHandshake {
       client_(client),
       store_(TicketStore::get_instance(state_dir)),
       addr_(addr),
-      addr_len_(addr_len) {}
+      addr_len_(addr_len),
+      pad_dist_(0, kMaxPadding) {}
 
   ~SessionTicketHandshake() = default;
 
@@ -221,18 +224,21 @@ class SessionTicketHandshake {
   SessionTicketHandshake(const SessionTicketHandshake&) = delete;
   void operator=(const SessionTicketHandshake&) = delete;
 
+  /** @{ */
   /** The HMAC-SHA-256 digest length (M, MAC) */
   static constexpr size_t kDigestLength = 16;
   /** The maximum allowed padding length (P_C) */
   static constexpr size_t kMaxPadding = 1388;
+  /** @} */
 
-  /** Generate the appropriate pad length for P_C */
-  uint16_t gen_padlen() const;
-
+  /** @{ */
   Client& client_; /**< The Client instance the handshake is for */
   TicketStore& store_;              /**< Ticket store */
   const struct sockaddr* addr_;     /**< Remote peer address */
   const socklen_t addr_len_;        /**< Length of addr_ */
+  crypto::RandOpenSSL rand_;      /**< CSPRNG */
+  ::std::uniform_int_distribution<uint32_t> pad_dist_; /**< Padding distribution */
+  /** @} */
 };
 
 } // namespace scramblesuit

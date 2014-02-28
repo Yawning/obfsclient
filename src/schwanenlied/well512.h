@@ -36,10 +36,9 @@
 
 #include <array>
 
-#include <event2/util.h>
-
 #include "schwanenlied/common.h"
 #include "schwanenlied/crypto/hkdf_sha256.h"
+#include "schwanenlied/crypto/rand_openssl.h"
 
 namespace schwanenlied {
 
@@ -99,14 +98,14 @@ class Well512 {
   /** Smallest possible value in the output range */
   static constexpr result_type min() { return 0; }
   /** Largest possible value in the output range */
-  static constexpr result_type max() { return 0xffffffffUL; }
+  static constexpr result_type max() { return UINT32_MAX; }
   /** @} */
 
   /**
    * Seed the existing Well512 instance
    *
    * The provided seed is extracted/expanded via HKDF-SHA256.  If the provided
-   * seed is empty, the internal state is randomized from libevent2's random
+   * seed is empty, the internal state is randomized from OpenSSL's random
    * number generator.
    *
    * @param[in] buf   The seed to use
@@ -115,7 +114,10 @@ class Well512 {
   void seed(const uint8_t* buf,
             const size_t len) {
     if (buf == nullptr || len == 0) {
-      ::evutil_secure_rng_get_bytes(state_.data(), kStateSize);
+      crypto::RandOpenSSL rand;
+      if (!rand.get_bytes(reinterpret_cast<uint8_t*>(state_.data()),
+                          kStateSize))
+        SL_ABORT("Failed to seed from OpenSSL");
     } else {
       const auto ikm = crypto::SecureBuffer(buf, len);
       const auto prk = crypto::HkdfSha256::extract(nullptr, 0, ikm);

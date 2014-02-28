@@ -38,8 +38,6 @@
 
 #include <event2/buffer.h>
 
-#include <openssl/rand.h>
-
 #include "schwanenlied/pt/obfs2/client.h"
 
 namespace schwanenlied {
@@ -60,7 +58,7 @@ void Client::on_outgoing_connected() {
                              << remote_addr_str_ << ")";
 
   // Derive INIT_SEED
-  if (1 != ::RAND_bytes(&init_seed_[0], init_seed_.size())) {
+  if (!rand_.get_bytes(&init_seed_[0], init_seed_.size())) {
     CLOG(ERROR, kLogger) << "Failed to derive INIT_SEED "
                          << "(" << this << ")";
     send_socks5_response(Reply::kGENERAL_FAILURE);
@@ -99,7 +97,8 @@ void Client::on_outgoing_connected() {
    */
 
   // Generate the encrypted data
-  const auto padlen = gen_padlen();
+  const auto padlen = pad_dist_(rand_);
+  SL_ASSERT(padlen <= kMaxPadding);
   ::std::array<uint32_t, 2> pad_hdr;
   constexpr size_t pad_hdr_sz = pad_hdr.size() * sizeof(uint32_t);
   pad_hdr.at(0) = htonl(kMagicValue);
@@ -134,7 +133,12 @@ void Client::on_outgoing_connected() {
   // Generate and send the random data
   if (padlen > 0) {
     uint8_t padding[kMaxPadding];
-    ::evutil_secure_rng_get_bytes(padding, padlen);
+    if (!rand_.get_bytes(padding, padlen)) {
+      CLOG(ERROR, kLogger) << "Failed to generate padding "
+                           << "(" << this << ")";
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
+    }
 
     if (!initiator_aes_.process(padding, padlen, padding)) {
       CLOG(ERROR, kLogger) << "Failed to encrypt padding "
@@ -397,20 +401,6 @@ bool Client::kdf_obfs2() {
     return false;
 
   return true;
-}
-
-uint32_t Client::gen_padlen() const {
-  uint32_t ret;
-
-  // Sigh, why 8192 instead of 8192 - 1 :(
-  do {
-    ::evutil_secure_rng_get_bytes(&ret, sizeof(ret));
-    ret &= 0x2fff;
-  } while (ret > kMaxPadding);
-
-  SL_ASSERT(ret < kMaxPadding);
-
-  return ret;
 }
 
 } // namespace obfs2

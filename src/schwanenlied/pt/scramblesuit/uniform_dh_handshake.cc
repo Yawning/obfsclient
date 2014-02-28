@@ -43,19 +43,6 @@ namespace schwanenlied {
 namespace pt {
 namespace scramblesuit {
 
-uint16_t UniformDHHandshake::gen_padlen() const {
-  uint16_t ret;
-
-  do {
-    ::evutil_secure_rng_get_bytes(&ret, sizeof(ret));
-    ret &= 0x5ff;
-  } while (ret > kMaxPadding);
-
-  SL_ASSERT(ret <= kMaxPadding);
-
-  return ret;
-}
-
 bool UniformDHHandshake::send_handshake_msg() {
   if (client_.outgoing_ == nullptr)
     return false;
@@ -88,9 +75,11 @@ bool UniformDHHandshake::send_handshake_msg() {
 
   // Generate P_C
   ::std::array<uint8_t, kMaxPadding> p_c;
-  const auto padlen = gen_padlen();
+  const auto padlen = pad_dist_(rand_);
+  SL_ASSERT(padlen <= kMaxPadding);
   if (padlen > 0) {
-    ::evutil_secure_rng_get_bytes(p_c.data(), padlen);
+    if (!rand_.get_bytes(p_c.data(), padlen))
+      return false;
     if (!hmac_.update(p_c.data(), padlen))
       return false;
   }

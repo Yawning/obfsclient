@@ -34,8 +34,11 @@
 #ifndef SCHWANENLIED_PT_SCRAMBLESUIT_UNIFORM_DH_HANDSHAKE_H__
 #define SCHWANENLIED_PT_SCRAMBLESUIT_UNIFORM_DH_HANDSHAKE_H__
 
+#include <random>
+
 #include "schwanenlied/common.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
+#include "schwanenlied/crypto/rand_openssl.h"
 #include "schwanenlied/crypto/sha256.h"
 #include "schwanenlied/crypto/uniform_dh.h"
 #include "schwanenlied/crypto/utils.h"
@@ -60,6 +63,7 @@ class UniformDHHandshake {
   UniformDHHandshake(Client& client,
                      const crypto::SecureBuffer& shared_secret) :
       client_(client),
+      pad_dist_(0, kMaxPadding),
       hmac_(shared_secret) {}
 
   ~UniformDHHandshake() = default;
@@ -94,6 +98,7 @@ class UniformDHHandshake {
   UniformDHHandshake(const UniformDHHandshake&) = delete;
   void operator=(const UniformDHHandshake&) = delete;
 
+  /** @{ */
   /** The length of the resultant shared secret */
   static constexpr size_t kSharedSecretLength = crypto::Sha256::kDigestLength;
   /** The UniformDH public key length (X, Y) */
@@ -105,10 +110,9 @@ class UniformDHHandshake {
   /** The maximum allowed total handshake message length */
   static constexpr size_t kMaxMsgLength = kKeyLength + kMaxPadding +
       kDigestLength * 2;
+  /** @} */
 
-  /** Generate pad length suitable for P_C */
-  uint16_t gen_padlen() const;
-
+  /** @{ */
   /** The Client instance that the handshake is for */
   Client& client_;
   /** The remote peer's public UniformDH key */
@@ -119,9 +123,15 @@ class UniformDHHandshake {
   ::std::unique_ptr<crypto::SecureBuffer> remote_mac_;
   /** The number of hours since the epoch */
   ::std::string epoch_hour_;
+  /** The padding distribution */
+  ::std::uniform_int_distribution<uint32_t> pad_dist_;
+  /** @} */
 
+  /** @{ */
   crypto::UniformDH uniform_dh_;  /**< The UniformDH instance */
   crypto::HmacSha256 hmac_;       /**< The HMAC-SHA256-128 instance */
+  crypto::RandOpenSSL rand_;      /**< CSPRNG */
+  /** @} */
 };
 
 } // namespace scramblesuit

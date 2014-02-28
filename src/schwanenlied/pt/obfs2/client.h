@@ -34,9 +34,12 @@
 #ifndef SCHWANENLIED_PT_OBFS2_CLIENT_H__
 #define SCHWANENLIED_PT_OBFS2_CLIENT_H__
 
+#include <random>
+
 #include "schwanenlied/common.h"
 #include "schwanenlied/socks5_server.h"
 #include "schwanenlied/crypto/aes.h"
+#include "schwanenlied/crypto/rand_openssl.h"
 #include "schwanenlied/crypto/sha256.h"
 
 namespace schwanenlied {
@@ -77,7 +80,8 @@ class Client : public Socks5Server::Session {
       received_seed_hdr_(false),
       resp_pad_len_(0),
       init_seed_(kSeedLength, 0),
-      resp_seed_(kSeedLength, 0) {}
+      resp_seed_(kSeedLength, 0),
+      pad_dist_(0, kMaxPadding) {}
 
   ~Client() = default;
 
@@ -129,9 +133,6 @@ class Client : public Socks5Server::Session {
    * @returns false - Failure
    */
   bool kdf_obfs2();
-
-  /** Generate PADLEN per the obfs2 spec */
-  uint32_t gen_padlen() const;
   /** @} */
 
   ::el::Logger* logger_;            /**< The obfs2 session logger */
@@ -139,6 +140,7 @@ class Client : public Socks5Server::Session {
   /** @{ */
   crypto::Aes128Ctr initiator_aes_; /**< Initiator->Responder E(K,s) */
   crypto::Aes128Ctr responder_aes_; /**< Responder->Initiator E(K,s) */
+  crypto::RandOpenSSL rand_;        /**< CSPRNG */
   /** @} */
 
   /** @{ */
@@ -146,6 +148,7 @@ class Client : public Socks5Server::Session {
   size_t resp_pad_len_;             /**< Amount of padding to discard */
   crypto::SecureBuffer init_seed_;  /**< obfs2 INIT_SEED */
   crypto::SecureBuffer resp_seed_;  /**< obfs2 RESP_SEED */
+  ::std::uniform_int_distribution<uint32_t> pad_dist_;  /** Padding distribution */
   /** @} */
 };
 

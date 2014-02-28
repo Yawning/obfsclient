@@ -61,10 +61,16 @@ void Client::on_outgoing_connected() {
   }
 
   // Send the appropriate amount of random padding
-  const auto padlen = gen_padlen();
+  const auto padlen = pad_dist_(rand_);
+  SL_ASSERT(padlen <= kMaxPadding / 2);
   if (padlen > 0) {
     uint8_t padding[kMaxPadding / 2];
-    ::evutil_secure_rng_get_bytes(padding, padlen);
+    if (!rand_.get_bytes(padding, padlen)) {
+      CLOG(ERROR, kLogger) << "Failed to generate padding "
+                           << "(" << this << ")";
+      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return;
+    }
 
     if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
       CLOG(ERROR, kLogger) << "Failed to send key padding "
@@ -84,10 +90,16 @@ void Client::on_incoming_data() {
   
   if (!sent_magic_) {
     // Send random padding
-    const auto padlen = gen_padlen();
+    const auto padlen = pad_dist_(rand_);
+    SL_ASSERT(padlen <= kMaxPadding / 2);
     if (padlen > 0) {
       uint8_t padding[kMaxPadding / 2];
-      ::evutil_secure_rng_get_bytes(padding, padlen);
+      if (!rand_.get_bytes(padding, padlen)) {
+        CLOG(ERROR, kLogger) << "Failed to generate post-key padding "
+                             << "(" << this << ")";
+        send_socks5_response(Reply::kGENERAL_FAILURE);
+        return;
+      }
       if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
         CLOG(ERROR, kLogger) << "Failed to send post-key padding "
                              << "(" << this << ")";
@@ -297,20 +309,6 @@ bool Client::kdf_obfs3(const crypto::SecureBuffer& shared_secret) {
     return false;
 
   return true;
-}
-
-uint16_t Client::gen_padlen() const {
-  uint16_t ret;
-
-  // Sigh, why 8194 instead of 8192 - 1 :(
-  do {
-    ::evutil_secure_rng_get_bytes(&ret, sizeof(ret));
-    ret &= 0x2fff;
-  } while (ret > kMaxPadding / 2);
-
-  SL_ASSERT(ret <= kMaxPadding / 2);
-
-  return ret;
 }
 
 } // namespace obfs3
