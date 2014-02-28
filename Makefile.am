@@ -24,7 +24,7 @@ common_sources = src/schwanenlied/crypto/base32.cc \
 
 # obfsclient
 bin_PROGRAMS = obfsclient
-obfsclient_CPPFLAGS = -I$(srcdir)/src
+obfsclient_CPPFLAGS = -I$(srcdir)/src -I$(srcdir)
 obfsclient_CXXFLAGS = ${AM_CXXFLAGS} ${libevent_CFLAGS} ${liballium_CFLAGS} ${OPENSSL_INCLUDES}
 obfsclient_LDADD = ${libevent_LIBS} ${liballium_LIBS} ${OPENSSL_LIBS} ${OPENSSL_LDFLAGS} ${PTHREAD_LIBS}
 obfsclient_SOURCES = ${common_sources} \
@@ -35,7 +35,7 @@ TESTS = obfsclient_test
 
 check_PROGRAMS = obfsclient_test
 
-obfsclient_test_CPPFLAGS = -I$(srcdir)/src
+obfsclient_test_CPPFLAGS = -I$(srcdir)/src -I$(srcdir)
 obfsclient_test_CXXFLAGS = ${AM_CXXFLAGS} ${libevent_CFLAGS} ${liballium_CFLAGS} ${OPENSSL_INCLUDES}
 obfsclient_test_LDADD = ${libevent_LIBS} ${liballium_LIBS} ${OPENSSL_LIBS} ${OPENSSL_LDFLAGS} ${PTHREAD_LIBS}
 obfsclient_test_SOURCES = ${common_sources} \

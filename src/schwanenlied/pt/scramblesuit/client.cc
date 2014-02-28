@@ -160,11 +160,16 @@ void Client::on_incoming_data() {
 
   CLOG(DEBUG, kLogger) << "on_incoming_data(): Have " << len << " bytes";
 
+#ifdef ENABLE_SCRAMBLESUIT_IAT
   // Schedule the next transmit
   if (!schedule_iat_transmit()) {
     server_.close_session(this);
     return;
   }
+#else
+  // Transmit the entire buffer
+  on_iat_transmit(true);
+#endif
 }
 
 void Client::on_outgoing_data_connecting() {
@@ -369,13 +374,17 @@ void Client::on_outgoing_data() {
           packet_len_rng_.reset(decode_buf_.data() + kHeaderLength,
                                 decode_payload_len_, kHeaderLength,
                                 kMaxFrameLength);
+#ifdef ENABLE_SCRAMBLESUIT_IAT
           packet_int_rng_.reset(decode_buf_.data() + kHeaderLength,
                                 decode_payload_len_, 0,
                                 kMaxPacketDelay);
+#endif
           CLOG(DEBUG, kLogger) << "Packet length probabilities: "
                                << packet_len_rng_.to_string();
+#ifdef ENABLE_SCRAMBLESUIT_IAT
           CLOG(DEBUG, kLogger) << "Packet interval probabilities (x100 usec): "
                                << packet_int_rng_.to_string();
+#endif
           break;
         case PacketFlags::kNEW_TICKET:
           CLOG(INFO, kLogger) << "Received new Session Ticket, persisting";
@@ -399,6 +408,7 @@ void Client::on_outgoing_data() {
   }
 }
 
+#ifdef ENABLE_SCRAMBLESUIT_IAT
 bool Client::on_outgoing_flush() {
   /*
    * This is called when incoming_ is closed, and the base instance wants to
@@ -416,6 +426,7 @@ bool Client::on_outgoing_flush() {
 
   return !evtimer_pending(iat_timer_ev_, nullptr);
 }
+#endif
 
 bool Client::kdf_scramblesuit(const crypto::SecureBuffer& k_t) {
   /*
@@ -459,6 +470,7 @@ bool Client::kdf_scramblesuit(const crypto::SecureBuffer& k_t) {
   return true;
 }
 
+#ifdef ENABLE_SCRAMBLESUIT_IAT
 bool Client::schedule_iat_transmit() {
   // Lazy timer initialization
   if (iat_timer_ev_ == nullptr) {
@@ -490,77 +502,83 @@ bool Client::schedule_iat_transmit() {
 
   return true;
 }
+#endif
 
-void Client::on_iat_transmit() {
+void Client::on_iat_transmit(const bool send_all) {
   if (state_ != State::kESTABLISHED && state_ != State::kFLUSHING_OUTGOING)
     return;
 
   struct evbuffer* buf = ::bufferevent_get_input(incoming_);
-  const size_t len = ::evbuffer_get_length(buf);
+  size_t len = ::evbuffer_get_length(buf);
   if (len == 0)
     return;
 
   CLOG(DEBUG, kLogger) << "on_iat_transmit(): Have " << len << " bytes";
 
-  const size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
-  uint8_t* p = ::evbuffer_pullup(buf, frame_payload_len);
-  if (p == nullptr) {
-    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
-                         << "(" << this << ")";
-    server_.close_session(this);
-    return;
-  }
-
-  size_t pad_len = 0;
-  if (frame_payload_len < kMaxPayloadLength || len == kMaxPayloadLength) {
-    /*
-     * Only append padding if the transmitted frame is not full sized, unless
-     * sending a full sized frame will completely drain the IAT buffer.
-     *
-     * I don't *think* that sending full frames without padding in the case of
-     * sustained data transfer is something that's fingerprintable and it would
-     * look more suspicious if "sustained" bursts had random padding.
-     */
-    const size_t burst_tail_len = frame_payload_len % kMaxFrameLength;
-    const uint32_t sample_len = packet_len_rng_();
-    if (sample_len >= burst_tail_len)
-      pad_len = sample_len - burst_tail_len;
-    else
-      pad_len = (kMaxFrameLength - burst_tail_len) + sample_len;
-  }
-
-  if (pad_len >= kHeaderLength && pad_len + frame_payload_len <= kMaxPayloadLength) {
-    // XXX: In theory, it's possible to incrementally send padding as well?
-    if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength)) {
+  do {
+    const size_t frame_payload_len = ::std::min(len, kMaxPayloadLength);
+    uint8_t* p = ::evbuffer_pullup(buf, frame_payload_len);
+    if (p == nullptr) {
+      CLOG(ERROR, kLogger) << "Failed to pullup buffer "
+                           << "(" << this << ")";
       server_.close_session(this);
       return;
     }
-    pad_len = 0;
-  } else if (!send_outgoing_frame(p, frame_payload_len, 0)) {
-    server_.close_session(this);
-    return;
-  }
 
-  // Remove the processed payload from the rx queue
-  ::evbuffer_drain(buf, frame_payload_len);
+    size_t pad_len = 0;
+    if (frame_payload_len < kMaxPayloadLength || len == kMaxPayloadLength) {
+      /*
+       * Only append padding if the transmitted frame is not full sized, unless
+       * sending a full sized frame will completely drain the IAT buffer.
+       *
+       * I don't *think* that sending full frames without padding in the case of
+       * sustained data transfer is something that's fingerprintable and it would
+       * look more suspicious if "sustained" bursts had random padding.
+       */
+      const size_t burst_tail_len = frame_payload_len % kMaxFrameLength;
+      const uint32_t sample_len = packet_len_rng_();
+      if (sample_len >= burst_tail_len)
+        pad_len = sample_len - burst_tail_len;
+      else
+        pad_len = (kMaxFrameLength - burst_tail_len) + sample_len;
+    }
 
-  // Send remaining padding if any exists
-  if (pad_len > kHeaderLength) {
-    if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength)) {
+    if (pad_len >= kHeaderLength && pad_len + frame_payload_len <= kMaxPayloadLength) {
+      // XXX: In theory, it's possible to incrementally send padding as well?
+      if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength)) {
+        server_.close_session(this);
+        return;
+      }
+      pad_len = 0;
+    } else if (!send_outgoing_frame(p, frame_payload_len, 0)) {
       server_.close_session(this);
       return;
     }
-  } else if (pad_len > 0) {
-    if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength)) {
-      server_.close_session(this);
-      return;
-    }
-    if (!send_outgoing_frame(nullptr, 0, pad_len)) {
-      server_.close_session(this);
-      return;
-    }
-  }
 
+    // Remove the processed payload from the rx queue
+    ::evbuffer_drain(buf, frame_payload_len);
+    len = ::evbuffer_get_length(buf);
+
+    // Send remaining padding if any exists
+    if (pad_len > kHeaderLength) {
+      if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength)) {
+        server_.close_session(this);
+        return;
+      }
+    } else if (pad_len > 0) {
+      if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength)) {
+        server_.close_session(this);
+        return;
+      }
+      if (!send_outgoing_frame(nullptr, 0, pad_len)) {
+        server_.close_session(this);
+        return;
+      }
+    }
+
+  } while (send_all && len  > 0);
+
+#ifdef ENABLE_SCRAMBLESUIT_IAT
   if (::evbuffer_get_length(buf) > 0) {
     if (!schedule_iat_transmit()) {
       server_.close_session(this);
@@ -568,6 +586,7 @@ void Client::on_iat_transmit() {
     }
   } else
     CLOG(DEBUG, kLogger) << "IAT TX buffer drained";
+#endif
 }
 
 bool Client::send_outgoing_frame(const uint8_t* buf,

@@ -82,13 +82,19 @@ class Client : public Socks5Server::Session {
       handshake_(HandshakeMethod::kINVALID),
       decode_state_(FrameDecodeState::kREAD_HEADER),
       decode_buf_len_(0),
+#ifdef ENABLE_SCRAMBLESUIT_IAT
       packet_len_rng_(kHeaderLength, kMaxFrameLength),
       packet_int_rng_(0, kMaxPacketDelay),
       iat_timer_ev_(nullptr) {}
+#else
+      packet_len_rng_(kHeaderLength, kMaxFrameLength) {}
+#endif
 
   ~Client() {
+#ifdef ENABLE_SCRAMBLESUIT_IAT
     if (iat_timer_ev_ != nullptr)
       ::event_free(iat_timer_ev_);
+#endif
   }
 
  protected:
@@ -105,7 +111,9 @@ class Client : public Socks5Server::Session {
 
   void on_outgoing_data() override;
 
+#ifdef ENABLE_SCRAMBLESUIT_IAT
   bool on_outgoing_flush() override;
+#endif
 
  private:
   Client(const Client&) = delete;
@@ -155,6 +163,7 @@ class Client : public Socks5Server::Session {
    */
   bool kdf_scramblesuit(const crypto::SecureBuffer& k_t);
 
+#ifdef ENABLE_SCRAMBLESUIT_IAT
   /**
    * Schedule the Inter-Arrival Time obfuscation TX timer
    *
@@ -162,11 +171,14 @@ class Client : public Socks5Server::Session {
    * @returns false - Failure
    */
   bool schedule_iat_transmit();
+#endif
 
   /**
    * Inter-Arrivial Time obfuscation TX timer callback
+   *
+   * @param[in] send_all  Send the entire buffer
    */
-  void on_iat_transmit();
+  void on_iat_transmit(const bool send_all=false);
 
   /**
    * Encode and send an outgoing ScrambleSuit frame
@@ -220,8 +232,10 @@ class Client : public Socks5Server::Session {
 
   /** @{ */
   ProbDist packet_len_rng_;     /**< Packet length morpher */
+#ifdef ENABLE_SCRAMBLESUIT_IAT
   ProbDist packet_int_rng_;     /**< Packet interval morpher */
   struct event* iat_timer_ev_;  /**< Packet interval TX event */
+#endif
   /** @} */
 
   /** @{ */

@@ -46,6 +46,8 @@
 #define _ELPP_DISABLE_DEFAULT_CRASH_HANDLING
 #include "ext/easylogging++.h"
 
+#include "config.h"
+
 /**
  * An assert() replacement that will unconditionally be called
  *

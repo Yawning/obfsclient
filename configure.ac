@@ -9,9 +9,17 @@ AC_INIT([obfsclient],
 	[obfsclient],
 	[https://github.com/Yawning/obfsclient])
 AC_PREREQ([2.69])
-AM_INIT_AUTOMAKE([no-define foreign -Wall])
+AM_INIT_AUTOMAKE([1.10 no-define foreign -Wall])
+AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_CXX
+
+AC_ARG_ENABLE(scramblesuit_iat,
+              AS_HELP_STRING([--enable-scramblesuit-iat],
+                             [Enable ScrambleSuit IAT obfuscation]),
+[if test x$enableval = xyes; then
+  AC_DEFINE(ENABLE_SCRAMBLESUIT_IAT, 1, [Enable ScrambleSuit IAT obfuscation])
+fi])
 
 # Include a bunch of macros
 m4_include([m4/ax_pthread.m4])
