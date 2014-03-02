@@ -61,17 +61,27 @@ bool Client::on_client_authenticate(const uint8_t* uname,
                                     const uint8_t plen) {
   static const ::std::string passwd_prefix("password=");
   static constexpr size_t passwd_len_base32 = 32;
-  if (static_cast<uint16_t>(ulen) + plen == 0) {
+
+  /* Yes, 2, because ulen/plen are >= 1 per the socks spec */
+  if (static_cast<uint16_t>(ulen) + plen <= 2) {
     CLOG(WARNING, kLogger) << "Expected a bridge password, got nothing "
                            << "(" << this << ")";
     return false;
   }
 
+  /*
+   * Jam the uname/passwd fields together.  Since the basic username/password
+   * auth algorithm has mandetory field sizes of 1, also trim off any trailing
+   * NUL characters.
+   */
   ::std::string args(static_cast<size_t>(ulen) + plen, 0);
   if (uname != nullptr)
     ::std::memcpy(&args[0], uname, ulen);
   if (passwd != nullptr)
     ::std::memcpy(&args[ulen], passwd, plen);
+  const auto tail = args.find_last_not_of('\0');
+  if (tail != ::std::string::npos)
+    args.erase(tail + 1);
 
   // One day I will write a CSV parser
   const size_t pos = args.find(passwd_prefix);
@@ -83,14 +93,14 @@ burn:
     return false;
   }
 
-  if (args.size() < passwd_prefix.length() + passwd_len_base32) {
-    CLOG(WARNING, kLogger) << "Bridge password under-sized, expected 32 bytes "
+  if (args.size() != passwd_prefix.size() + passwd_len_base32) {
+    CLOG(WARNING, kLogger) << "Bridge password length invalid, expected 32 bytes "
                            << "(" << this << ")";
     goto burn;
   }
 
   const uint8_t* passwd_base32 = reinterpret_cast<const uint8_t*>(
-      args.data() + passwd_prefix.length());
+      args.data() + passwd_prefix.size());
   const size_t len = crypto::Base32::decode(passwd_base32, passwd_len_base32,
                                             shared_secret_);
   if (len != kSharedSecretLength) {
