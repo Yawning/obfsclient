@@ -43,10 +43,10 @@ obfsclient_test_SOURCES = ${common_sources} \
 	src/schwanenlied/crypto/base32_test.cc \
 	src/schwanenlied/crypto/hkdf_sha256_test.cc \
 	src/schwanenlied/crypto/hmac_sha256_test.cc \
+        src/schwanenlied/crypto/rand_ctr_drbg_test.cc \
 	src/schwanenlied/crypto/sha256_test.cc \
 	src/schwanenlied/crypto/uniform_dh_test.cc \
 	src/schwanenlied/crypto/utils_test.cc \
-        src/schwanenlied/well512_test.cc \
 	src/gtest/gtest-all.cc \
 	src/gtest/gtest_main.cc
 

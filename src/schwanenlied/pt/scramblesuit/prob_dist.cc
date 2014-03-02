@@ -73,6 +73,9 @@ void ProbDist::reset(const uint8_t* seed,
   // Setup the disctete distribution
   typedef ::std::discrete_distribution<>::param_type param_type;
   prob_dist_.param(param_type(weights.begin(), weights.end()));
+
+  // Reseed since, the part that needs to be deterministic is over
+  rng_.seed();
 }
 
 const ::std::string ProbDist::to_string() const {

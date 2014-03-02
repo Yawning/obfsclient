@@ -38,7 +38,7 @@
 #include <string>
 
 #include "schwanenlied/common.h"
-#include "schwanenlied/well512.h"
+#include "schwanenlied/crypto/rand_ctr_drbg.h"
 
 namespace schwanenlied {
 namespace pt {
@@ -111,8 +111,8 @@ class ProbDist {
   /** The uniform distribution for generating the probabilities */
   ::std::uniform_int_distribution<int> weight_dist_;
 
-  /** The Well512 PRNG */
-  Well512 rng_;
+  /** The CTR_DRBG-AES-128 PRNG */
+  crypto::RandCtrDrbg rng_;
   /** The possible outcomes */
   ::std::vector<uint32_t> values_;
   /** The weighted distribution used to return a value */

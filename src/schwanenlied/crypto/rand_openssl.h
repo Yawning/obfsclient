@@ -88,4 +88,4 @@ class RandOpenSSL {
 } // namespace crypto
 } // namespace schwanenlied
 
-#endif
+#endif // SCHWANENLIED_CRYPTO_RAND_OPENSSL_H__

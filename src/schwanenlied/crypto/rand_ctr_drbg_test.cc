@@ -29,19 +29,20 @@
 #include <iostream>
 #include <random>
 
-#include "schwanenlied/well512.h"
+#include "schwanenlied/crypto/rand_ctr_drbg.h"
 #include "gtest/gtest.h"
 
 namespace schwanenlied {
+namespace crypto {
 
-class Well512Test : public ::testing::Test {
+class RandCtrDrbgTest : public ::testing::Test {
  protected:
   virtual void SetUp() {}
   virtual void TearDown() {}
 };
 
-TEST_F(Well512Test, SmokeTest) {
-  Well512 rng;
+TEST_F(RandCtrDrbgTest, SmokeTest) {
+  RandCtrDrbg rng;
 
   ::std::uniform_int_distribution<int> foo(1, 6);
   ::std::array<int, 6> counts = {{ 0 }};
@@ -57,4 +58,5 @@ TEST_F(Well512Test, SmokeTest) {
   ::std::cout << ::std::endl;
 }
 
+} // namespace crypto
 } // namespace schwanenlied
