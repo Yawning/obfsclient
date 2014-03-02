@@ -83,8 +83,8 @@ do {                                                                    \
 /**
  * std::to_string replacement
  *
- * Some versions of gcc/libstdc++ still in use (GCC 4.7.x in Debian/FreeBSD
- * ports) are missing std::to_string
+ * Some versions of gcc/libstdc++ still in use (GCC from FreeBSD ports) is
+ * missing std::to_string.
  *
  * @param[in] value  The value to convert to a string
  *

@@ -35,7 +35,8 @@
 #include <event2/util.h>
 
 #include <array>
-#include <ctime>
+#include <climits>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -158,11 +159,17 @@ Ticket* TicketStore::get(const struct sockaddr* addr,
   tickets_.erase(iter);
   save_tickets();
 
+  if (ret->time() + kTicketLifeTime < ::std::time(nullptr)) {
+    delete ret;
+    return nullptr;
+  }
+
   return ret;
 }
 
 void TicketStore::set(const struct sockaddr* addr,
                       const socklen_t addr_len,
+                      const time_t time,
                       const uint8_t* buf,
                       const size_t len,
                       const bool do_write) {
@@ -172,8 +179,12 @@ void TicketStore::set(const struct sockaddr* addr,
   if (iter != tickets_.end())
     return;
 
+  // Ignore expired tickets
+  if (time + kTicketLifeTime < ::std::time(nullptr))
+    return;
+
   if (len == Ticket::kKeyLength + Ticket::kTicketLength) {
-    tickets_[key] = new Ticket(buf, len);
+    tickets_[key] = new Ticket(time, buf, len);
     if (do_write)
       save_tickets();
   }
@@ -196,11 +207,12 @@ void TicketStore::load_tickets(const ::std::string& state_dir) {
     if ('#' == line.front())
       continue;
 
-    // Expected format is "<address> <Base32 encoded key + ticket>"
+    // Expected format is "<address> <Base32 encoded key + ticket> <time_t>"
     ::std::istringstream iss(line);
     ::std::string addr_str;
     ::std::string blob_base32;
-    if (!(iss >> addr_str >> blob_base32))
+    ::std::string time_str;
+    if (!(iss >> addr_str >> blob_base32 >> time_str))
       continue;
 
     struct sockaddr_storage addr;
@@ -216,8 +228,12 @@ void TicketStore::load_tickets(const ::std::string& state_dir) {
     if (Ticket::kKeyLength + Ticket::kTicketLength != len)
       continue;
 
+    auto time = ::std::strtoul(time_str.c_str(), nullptr, 10);
+    if (time == 0 || time == ULONG_MAX)
+      continue;
+
     set(reinterpret_cast<struct sockaddr*>(&addr),
-        static_cast<socklen_t>(addr_len),
+        static_cast<socklen_t>(addr_len), time,
         blob.data(), blob.size(), false);
   }
 }
@@ -235,7 +251,9 @@ void TicketStore::save_tickets() {
 
   // Write out all the tickets to disk
   for (const auto& iter : tickets_)
-    ofs << iter.first << " " << iter.second->to_string() << ::std::endl;
+    ofs << iter.first << " "
+        << iter.second->to_string() << " "
+        << to_string(iter.second->time()) << ::std::endl;
 }
 
 } // namespace scramblesuit

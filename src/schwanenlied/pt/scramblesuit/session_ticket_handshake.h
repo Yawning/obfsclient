@@ -36,6 +36,7 @@
 
 #include <netinet/in.h>
 
+#include <ctime>
 #include <map>
 #include <random>
 #include <string>
@@ -66,11 +67,14 @@ class SessionTicketHandshake {
     /**
      * Create a new Ticket given k_t | T
      *
+     * @param[in] time  The ticket issue time
      * @param[in] buf   The buffer containing k_t | T
      * @param[in] len   The length of buf (Must be kKeyLength + kTicketLength)
      */
-    Ticket(const uint8_t* buf,
-           const size_t len) {
+    Ticket(const time_t time,
+           const uint8_t* buf,
+           const size_t len) :
+        time_(time) {
       SL_ASSERT(len == kKeyLength + kTicketLength);
       key_.assign(buf, kKeyLength);
       ticket_.assign(buf + kKeyLength, kTicketLength);
@@ -84,6 +88,9 @@ class SessionTicketHandshake {
     /** Return the ticket */
     const crypto::SecureBuffer& ticket() const { return ticket_; }
 
+    /** Return the ticket issue time */
+    const time_t time() const { return time_; }
+
     /** Encode k_t | T via Base32 */
     ::std::string to_string() const;
 
@@ -94,6 +101,7 @@ class SessionTicketHandshake {
 
     crypto::SecureBuffer key_;    /**< k_t */
     crypto::SecureBuffer ticket_; /**< The ticket */
+    const time_t time_;           /**< The issue time */
   };
 
   /**
@@ -146,12 +154,14 @@ class SessionTicketHandshake {
      *
      * @param[in] addr      The address/port of the remote peer
      * @param[in] addr_len  The length of addr
+     * @param[in] time      The ticket issue time
      * @param[in] buf       The buffer containing the key/ticket
      * @param[in] len       The length of buf
      * @param[in] do_write  Commit the ticket store to disk
      */
     void set(const struct sockaddr* addr,
              const socklen_t addr_len,
+             const time_t time,
              const uint8_t* buf,
              const size_t len,
              const bool do_write = true);
@@ -164,6 +174,8 @@ class SessionTicketHandshake {
 
     /** The ticket file */
     static constexpr char kTicketFileName[] = "obfsclient-tickets.txt";
+    /** The ticket lifetime */
+    static constexpr time_t kTicketLifeTime = 60 * 60 * 24 * 7;
 
     /**
      * Load previously saved tickets from disk
@@ -217,7 +229,7 @@ class SessionTicketHandshake {
    */
   void on_new_ticket(const uint8_t* buf,
                      const size_t len) {
-    store_.set(addr_, addr_len_, buf, len);
+    store_.set(addr_, addr_len_, ::std::time(nullptr), buf, len);
   }
 
  private:
