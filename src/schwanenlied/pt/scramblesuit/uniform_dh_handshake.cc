@@ -84,7 +84,6 @@ bool UniformDHHandshake::send_handshake_msg() {
       return false;
   }
 
-  // The spec doesn't include M_S but the code does
   if (!hmac_.update(m_c.data(), m_c.size()))
       return false;
 
@@ -181,7 +180,6 @@ bool UniformDHHandshake::recv_handshake_msg(bool& is_finished) {
 
     // MAC the padding if any
     if (found.pos >= 0) {
-      /* The spec doesn't include M_S but the code does */
       const size_t to_mac = found.pos + remote_mark_->size();
       const uint8_t* p = ::evbuffer_pullup(buf, to_mac);
       if (p == nullptr)
