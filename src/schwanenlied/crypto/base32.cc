@@ -95,7 +95,24 @@ size_t decode(const uint8_t* buf,
   dst.clear();
   dst.resize(len * 5 / 8, 0); 
 
-  auto conv_char = [](const uint8_t c) -> uint8_t {
+  auto conv_char = [](uint8_t c) -> uint8_t {
+    /*
+     * Sanitize the input
+     *  * Convert to all upper case
+     *  * Handle commonly mistyped characters
+     *    * '0' -> 'O'
+     *    * '1' -> 'L'
+     *    * '8' -> 'B'
+     */
+    if (c >= 'a' && c <= 'z')
+      c -= 32;
+    if (c == '0')
+      c = 'O';
+    if (c == '1')
+      c = 'L';
+    if (c == '8')
+      c = 'B';
+
     if (c >= 'A' && c <= 'Z')
       return c - 'A';
     else if (c >= '2' && c <= '7')
