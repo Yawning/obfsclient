@@ -143,8 +143,8 @@ class RandCtrDrbg {
       const auto prk = crypto::HkdfSha256::extract(nullptr, 0, ikm);
       const auto okm = crypto::HkdfSha256::expand(prk, nullptr, 0, seed_len());
       SL_ASSERT(key.size() + ctr.size() == okm.size());
-      ::std::memcpy(&key[0], okm.data(), key.size());
-      ::std::memcpy(&ctr[0], okm.data() + key.size(), ctr.size());
+      key.assign(okm.data(), key.size());
+      ctr.assign(okm.data() + key.size(), ctr.size());
     }
 
     if (!ctr_.set_state(key, nullptr, 0, ctr.data(), ctr.size()))
