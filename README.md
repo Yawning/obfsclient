@@ -33,6 +33,10 @@ It currently has the following external dependencies:
  * [OpenSSL](https://www.openssl.org/)
  * [liballium](https://github.com/Yawning/liballium)
 
+Non-standard configure options:
+
+ * --enable-scramblesuit-iat - Enable ScrambleSuit IAT obfuscation
+
 Make Targets:
 
  * all - Build the obfsclient binary
