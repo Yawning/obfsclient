@@ -203,14 +203,20 @@ void Client::on_outgoing_data() {
 
     auto found = ::evbuffer_search(buf, reinterpret_cast<const char*>(responder_magic_.data()),
                                    responder_magic_.size(), nullptr);
-    if (found.pos == -1)
-      return;
-    if (found.pos > static_cast<ssize_t>(kMaxPadding + 1)) {
+    if (found.pos > static_cast<ssize_t>(kMaxPadding)) {
       CLOG(WARNING, kLogger) << "Peer sent too much padding: " << found.pos << " "
                              << "(" << this << ")";
       server_.close_session(this);
       return;
     }
+    if (found.pos == -1 && len > kMaxPadding + responder_magic_.size()) {
+      CLOG(WARNING, kLogger) << "Did not find mark within allowable limits "
+                             << "(" << this << ")";
+      server_.close_session(this);
+      return;
+    }
+    if (found.pos == -1)
+      return;
     ::evbuffer_drain(buf, found.pos + responder_magic_.size());
     received_magic_ = true;
   }
@@ -221,7 +227,7 @@ void Client::on_outgoing_data() {
   if (len == 0)
     return;
 
-  uint8_t *p = ::evbuffer_pullup(buf, len);
+  uint8_t* p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
     CLOG(ERROR, kLogger) << "Failed to pullup buffer "
                          << "(" << this << ")";

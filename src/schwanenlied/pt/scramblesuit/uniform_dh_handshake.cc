@@ -173,20 +173,22 @@ bool UniformDHHandshake::recv_handshake_msg(bool& is_finished) {
 
     auto found = ::evbuffer_search(buf, reinterpret_cast<const char*>(remote_mark_->data()),
                                    remote_mark_->size(), nullptr);
+    if (found.pos > static_cast<ssize_t>(kMaxPadding))
+      return false;
+    if (found.pos == -1 && len > kMaxPadding + remote_mark_->size())
+      return false;
     if (found.pos == -1)
       return true;
-    if (found.pos > static_cast<ssize_t>(kMaxPadding + 1))
-      return false;
 
-    // MAC the padding if any
-    if (found.pos >= 0) {
-      const size_t to_mac = found.pos + remote_mark_->size();
-      const uint8_t* p = ::evbuffer_pullup(buf, to_mac);
-      if (p == nullptr)
-        return false;
-      if (!hmac_.update(p, to_mac))
-        return false;
-    }
+    SL_ASSERT(found.pos >= 0);
+
+    // MAC the padding + Mark
+    const size_t to_mac = found.pos + remote_mark_->size();
+    const uint8_t* p = ::evbuffer_pullup(buf, to_mac);
+    if (p == nullptr)
+      return false;
+    if (!hmac_.update(p, to_mac))
+      return false;
 
     // MAC the epoch hour
     if (!hmac_.update(reinterpret_cast<const uint8_t*>(epoch_hour_.data()),
