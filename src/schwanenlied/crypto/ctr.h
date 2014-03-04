@@ -56,6 +56,7 @@ class Ctr {
    */
   Ctr() :
       has_state_(false),
+      iv_size_(0),
       ctr_(ecb_impl_.block_length(), 0),
       block_(ecb_impl_.block_length(), 0),
       offset_(0) {}

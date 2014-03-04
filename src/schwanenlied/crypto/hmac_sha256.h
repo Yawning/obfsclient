@@ -56,6 +56,7 @@ class HmacSha256 {
    * set_key() must be called before digests can be obtained.
    */
   HmacSha256() :
+      stream_state_(State::kINVALID),
       has_key_(false) {
     ::HMAC_CTX_init(&ctx_);
   }
@@ -66,6 +67,7 @@ class HmacSha256 {
    * @param[in] key   The key to use when calculating digests
    */
   HmacSha256(const SecureBuffer& key) :
+      stream_state_(State::kINVALID),
       has_key_(true),
       key_(key) {
     ::HMAC_CTX_init(&ctx_);
