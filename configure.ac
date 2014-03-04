@@ -17,9 +17,20 @@ AC_PROG_CXX
 AC_ARG_ENABLE(scramblesuit_iat,
               AS_HELP_STRING([--enable-scramblesuit-iat],
                              [Enable ScrambleSuit IAT obfuscation]),
-[if test x$enableval = xyes; then
+              enable_scramblesuit_iat=yes)
+AM_CONDITIONAL(ENABLE_SCRAMBLESUIT_IAT, test x$enable_scramblesuit_iat == xyes)
+if test x$enable_scramblesuit_iat == xyes; then
   AC_DEFINE(ENABLE_SCRAMBLESUIT_IAT, 1, [Enable ScrambleSuit IAT obfuscation])
-fi])
+fi
+
+AC_ARG_ENABLE(scramblesuit_session_ticket,
+              AS_HELP_STRING([--enable-scramblesuit-session-ticket],
+                             [Enable ScrambleSuit Session Ticket handshake]),
+              enable_scramblesuit_session_ticket=yes)
+AM_CONDITIONAL(ENABLE_SCRAMBLESUIT_SESSION_TICKET, test x$enable_scramblesuit_session_ticket == xyes)
+if test x$enable_scramblesuit_session_ticket == xyes; then
+  AC_DEFINE(ENABLE_SCRAMBLESUIT_SESSION_TICKET, 1, [Enable ScrambleSuit Session Ticket handshake])
+fi
 
 # Include a bunch of macros
 m4_include([m4/ax_pthread.m4])

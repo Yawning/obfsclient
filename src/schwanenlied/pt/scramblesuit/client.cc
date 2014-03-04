@@ -113,6 +113,7 @@ void Client::on_outgoing_connected() {
   CLOG(DEBUG, kLogger) << this << ": Packet length probabilities: "
                        << packet_len_rng_.to_string();
 
+#ifdef ENABLE_SCRAMBLESUIT_SESSION_TICKET
   // Session Ticket Handshake
   session_ticket_handshake_ = ::std::unique_ptr<SessionTicketHandshake>(
       new SessionTicketHandshake(*this,
@@ -139,6 +140,9 @@ void Client::on_outgoing_connected() {
     CLOG(INFO, kLogger) << this << ": Session Ticket handshake sent";
     handshake_ = HandshakeMethod::kSESSION_TICKET;
   } else {
+#else
+  if (true) {
+#endif
     // UniformDH handshake
     handshake_ = HandshakeMethod::kUNIFORM_DH;
     uniformdh_handshake_ = ::std::unique_ptr<UniformDHHandshake>(
@@ -179,6 +183,7 @@ void Client::on_incoming_data() {
 void Client::on_outgoing_data_connecting() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
+#ifdef ENABLE_SCRAMBLESUIT_SESSION_TICKET
   if (handshake_ == HandshakeMethod::kSESSION_TICKET) {
     SL_ASSERT(session_ticket_handshake_ != nullptr);
     SL_ASSERT(uniformdh_handshake_ == nullptr);
@@ -198,6 +203,9 @@ void Client::on_outgoing_data_connecting() {
       on_outgoing_data();
     }
   } else {
+#else
+  if (true) {
+#endif
     // UniformDH handshake
     SL_ASSERT(handshake_ == HandshakeMethod::kUNIFORM_DH);
     SL_ASSERT(uniformdh_handshake_ != nullptr);
@@ -372,10 +380,14 @@ void Client::on_outgoing_data() {
 #endif
           break;
         case PacketFlags::kNEW_TICKET:
+#ifdef ENABLE_SCRAMBLESUIT_SESSION_TICKET
           CLOG(INFO, kLogger) << this << ": Received new Session Ticket, persisting";
           SL_ASSERT(session_ticket_handshake_ != nullptr);
           session_ticket_handshake_->on_new_ticket(decode_buf_.data() + kHeaderLength,
                                                    decode_payload_len_);
+#else
+          CLOG(INFO, kLogger) << this << ": Received new Session Ticket, ignoring";
+#endif
           break;
         default:
           // Just ignore unknown/unsupported frame types

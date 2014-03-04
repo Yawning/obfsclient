@@ -43,8 +43,11 @@
 #include "schwanenlied/crypto/aes.h"
 #include "schwanenlied/crypto/hmac_sha256.h"
 #include "schwanenlied/pt/scramblesuit/prob_dist.h"
-#include "schwanenlied/pt/scramblesuit/session_ticket_handshake.h"
 #include "schwanenlied/pt/scramblesuit/uniform_dh_handshake.h"
+
+#ifdef ENABLE_SCRAMBLESUIT_SESSION_TICKET
+#include "schwanenlied/pt/scramblesuit/session_ticket_handshake.h"
+#endif
 
 namespace schwanenlied {
 namespace pt {
@@ -145,7 +148,9 @@ class Client : public Socks5Server::Session {
   enum class HandshakeMethod {
     kINVALID,           /**< Unknown handshake type */
     kUNIFORM_DH,        /**< UniformDH */
+#ifdef ENABLE_SCRAMBLESUIT_SESSION_TICKET
     kSESSION_TICKET     /**< Session Ticket */
+#endif
   };
 
   /** ScrambleSuit Packet Flag bitfield */
@@ -205,8 +210,10 @@ class Client : public Socks5Server::Session {
   HandshakeMethod handshake_;
   /** The UniformDHHandshake instance */
   ::std::unique_ptr<UniformDHHandshake> uniformdh_handshake_;
+#ifdef ENABLE_SCRAMBLESUIT_SESSION_TICKET
   /** The SessionTicketHandshake instance */
   ::std::unique_ptr<SessionTicketHandshake> session_ticket_handshake_;
+#endif
   /** @} */
 
   /** @{ */
@@ -241,8 +248,10 @@ class Client : public Socks5Server::Session {
   /** @} */
 
   /** @{ */
-  friend SessionTicketHandshake;
   friend UniformDHHandshake;
+#ifdef ENABLE_SCRAMBLESUIT_SESSION_TICKET
+  friend SessionTicketHandshake;
+#endif
   /** @} */
 };
 

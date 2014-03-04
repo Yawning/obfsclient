@@ -36,6 +36,7 @@ It currently has the following external dependencies:
 Non-standard configure options:
 
  * --enable-scramblesuit-iat - Enable ScrambleSuit IAT obfuscation
+ * --enable-scramblesuit-session-ticket - Enable ScrambleSuit Session Ticket handshake
 
 Make Targets:
 
