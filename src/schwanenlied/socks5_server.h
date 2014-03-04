@@ -169,6 +169,19 @@ class Socks5Server {
      * @returns false - Keep flushing at a later time
      */
     virtual bool on_outgoing_flush() { return true; }
+
+    /**
+     * Handshake timeout
+     *
+     * Called if the Session enters State::kCONNECTING, and does not call
+     * Session::send_socks5_response() within kConnectTimeout seconds.
+     *
+     * If implementations chose to override this, they SHOULD send an
+     * appropriate response, or otherwise close the Session.
+     */
+    virtual void on_connect_timeout() {
+      send_socks5_response(Reply::kTTL_EXPIRED);
+    }
     /** @} */
 
     /**

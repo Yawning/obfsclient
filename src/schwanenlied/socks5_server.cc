@@ -574,7 +574,7 @@ void Socks5Server::Session::incoming_read_request_cb() {
 void Socks5Server::Session::connect_timeout_cb() {
   SL_ASSERT(state_ == State::kCONNECTING);
   CLOG(WARNING, kLogger) << "Session handshake timeout (" << this << ")";
-  send_socks5_response(Reply::kTTL_EXPIRED);
+  on_connect_timeout();
 }
 
 void Socks5Server::Session::incoming_write_cb() {
@@ -662,17 +662,17 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     evtimer_add(connect_timer_ev_, &tv);
 
     // Setup the bufferevents
-    bufferevent_data_cb readcb = [](struct bufferevent *bev,
-                                    void *ctx) {
+    bufferevent_data_cb readcb = [](struct bufferevent* bev,
+                                    void* ctx) {
       reinterpret_cast<Session*>(ctx)->outgoing_read_cb();
     };
-    bufferevent_data_cb writecb = [](struct bufferevent *bev,
-                                     void *ctx) {
+    bufferevent_data_cb writecb = [](struct bufferevent* bev,
+                                     void* ctx) {
       reinterpret_cast<Session*>(ctx)->outgoing_write_cb();
     };
-    bufferevent_event_cb eventcb = [](struct bufferevent *bev,
+    bufferevent_event_cb eventcb = [](struct bufferevent* bev,
                                       short events,
-                                      void *ctx) {
+                                      void* ctx) {
       reinterpret_cast<Session*>(ctx)->outgoing_event_cb(events);
     };
     ::bufferevent_enable(outgoing_, EV_READ | EV_WRITE);
