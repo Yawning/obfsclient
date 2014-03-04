@@ -53,14 +53,11 @@ void Client::on_outgoing_connected() {
     'p', 'a', 'd', 'd', 'i', 'n', 'g'
   } };
 
-  CLOG(INFO, kLogger) << "Starting obfs2 handshake "
-                      << "(" << this << ": " << client_addr_str_ << " <-> "
-                             << remote_addr_str_ << ")";
+  CLOG(INFO, kLogger) << this << ": Starting obfs2 handshake";
 
   // Derive INIT_SEED
   if (!rand_.get_bytes(&init_seed_[0], init_seed_.size())) {
-    CLOG(ERROR, kLogger) << "Failed to derive INIT_SEED "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to derive INIT_SEED";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -75,8 +72,7 @@ void Client::on_outgoing_connected() {
   crypto::SecureBuffer init_pad_key(crypto::Sha256::kDigestLength, 0);
   if (!mac(init_mac_key.data(), init_mac_key.size(), init_seed_.data(),
            init_seed_.size(), init_pad_key)) {
-    CLOG(ERROR, kLogger) << "Failed to derive INIT_PAD_KEY "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to derive INIT_PAD_KEY";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -84,8 +80,7 @@ void Client::on_outgoing_connected() {
                                 nullptr, 0,
                                 init_pad_key.data() + crypto::kAes128KeyLength,
                                 init_pad_key.size() - crypto::kAes128KeyLength)) {
-    CLOG(ERROR, kLogger) << "Failed to set INIT_PAD_KEY "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to set INIT_PAD_KEY";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -108,24 +103,21 @@ void Client::on_outgoing_connected() {
   if (!initiator_aes_.process(reinterpret_cast<uint8_t*>(pad_hdr.data()),
                               pad_hdr_sz,
                               reinterpret_cast<uint8_t*>(pad_hdr.data()))) {
-    CLOG(ERROR, kLogger) << "Failed to encrypt header "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to encrypt header";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
 
   // Send INIT_SEED
   if (0 != ::bufferevent_write(outgoing_, init_seed_.data(), init_seed_.size())) {
-    CLOG(ERROR, kLogger) << "Failed to send INIT_SEED "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to send INIT_SEED";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
 
   // Send the header
   if (0 != ::bufferevent_write(outgoing_, pad_hdr.data(), pad_hdr_sz)) {
-    CLOG(ERROR, kLogger) << "Failed to send header "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to send header";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -134,30 +126,25 @@ void Client::on_outgoing_connected() {
   if (padlen > 0) {
     uint8_t padding[kMaxPadding];
     if (!rand_.get_bytes(padding, padlen)) {
-      CLOG(ERROR, kLogger) << "Failed to generate padding "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to generate padding";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
 
     if (!initiator_aes_.process(padding, padlen, padding)) {
-      CLOG(ERROR, kLogger) << "Failed to encrypt padding "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to encrypt padding";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
 
     if (0 != ::bufferevent_write(outgoing_, padding, padlen)) {
-      CLOG(ERROR, kLogger) << "Failed to send padding "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to send padding";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
   }
 
-  CLOG(DEBUG, kLogger) << "Initiator obfs2 handshake complete "
-                       << "(" << this << ": " <<client_addr_str_ << " <-> "
-                              << remote_addr_str_ << ")";
+  CLOG(DEBUG, kLogger) << this << ": Initiator obfs2 handshake complete";
 }
 
 void Client::on_incoming_data() {
@@ -172,27 +159,23 @@ void Client::on_incoming_data() {
 
   uint8_t* p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
-    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to pullup buffer";
     server_.close_session(this);
     return;
   }
   if (!initiator_aes_.process(p, len, p)) {
-    CLOG(ERROR, kLogger) << "Failed to encrypt client payload "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to encrypt client payload";
     server_.close_session(this);
     return;
   }
   if (::bufferevent_write(outgoing_, p, len) != 0) {
-    CLOG(ERROR, kLogger) << "Failed to send client payload "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to send client payload";
     server_.close_session(this);
     return;
   }
   ::evbuffer_drain(buf, len);
 
-  CLOG(DEBUG, kLogger) << "Sent " << len << " bytes to peer "
-                       << "(" << this << ")";
+  CLOG(DEBUG, kLogger) << this << ": Sent " << len << " bytes to peer";
 }
 
 void Client::on_outgoing_data_connecting() {
@@ -214,16 +197,14 @@ void Client::on_outgoing_data_connecting() {
     // Obtain RESP_SEED, and derive RESP_PAD_KEY
     if (static_cast<int>(kSeedLength) != ::evbuffer_remove(buf, &resp_seed_[0],
                                                            resp_seed_.size())) {
-      CLOG(ERROR, kLogger) << "Failed to read RESP_SEED "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to read RESP_SEED";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
     crypto::SecureBuffer resp_pad_key(crypto::Sha256::kDigestLength, 0);
     if (!mac(resp_mac_key.data(), resp_mac_key.size(), resp_seed_.data(),
            resp_seed_.size(), resp_pad_key)) {
-      CLOG(ERROR, kLogger) << "Failed to derive RESP_PAD_KEY "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to derive RESP_PAD_KEY";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
@@ -231,8 +212,7 @@ void Client::on_outgoing_data_connecting() {
                                   nullptr, 0,
                                   resp_pad_key.data() + crypto::kAes128KeyLength,
                                   resp_pad_key.size() - crypto::kAes128KeyLength)) {
-      CLOG(ERROR, kLogger) << "Failed to set RESP_PAD_KEY "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to set RESP_PAD_KEY";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
@@ -248,30 +228,26 @@ void Client::on_outgoing_data_connecting() {
     if (!responder_aes_.process(reinterpret_cast<uint8_t*>(pad_hdr.data()),
                                 pad_hdr_sz,
                                 reinterpret_cast<uint8_t*>(pad_hdr.data()))) {
-      CLOG(ERROR, kLogger) << "Failed to decrypt header "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to decrypt header";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
     if (ntohl(pad_hdr.at(0)) != kMagicValue) {
-      CLOG(WARNING, kLogger) << "Received invalid magic value from peer "
-                             << "(" << this << ")";
+      CLOG(WARNING, kLogger) << this << ": Received invalid magic value from peer";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
     resp_pad_len_ = ntohl(pad_hdr.at(1));
     if (resp_pad_len_ > kMaxPadding) {
-      CLOG(WARNING, kLogger) << "Peer claims to have sent too much padding: "
-                             << resp_pad_len_ << " "
-                             << "(" << this << ")";
+      CLOG(WARNING, kLogger) << this << ": Peer claims to have sent too much padding: "
+                             << resp_pad_len_;
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
 
     // Derive the actual keys
     if (!kdf_obfs2()) {
-      CLOG(ERROR, kLogger) << "Failed to derive session keys "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to derive session keys";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
@@ -289,9 +265,7 @@ void Client::on_outgoing_data_connecting() {
       return;
   }
 
-  CLOG(INFO, kLogger) << "Finished obfs2 handshake "
-                      << "(" << this << ": " << client_addr_str_ << " <-> "
-                             << remote_addr_str_ << ")";
+  CLOG(INFO, kLogger) << this << ": Finished obfs2 handshake";
 
   // Handshaked
   send_socks5_response(Reply::kSUCCEDED);
@@ -309,27 +283,23 @@ void Client::on_outgoing_data() {
 
   uint8_t* p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
-    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to pullup buffer";
     server_.close_session(this);
     return;
   }
   if (!responder_aes_.process(p, len, p)) {
-    CLOG(ERROR, kLogger) << "Failed to decrypt remote payload "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to decrypt remote payload";
     server_.close_session(this);
     return;
   }
   if (::bufferevent_write(incoming_, p, len) != 0) {
-    CLOG(ERROR, kLogger) << "Failed to send remote payload "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to send remote payload";
     server_.close_session(this);
     return;
   }
   ::evbuffer_drain(buf, len);
 
-  CLOG(DEBUG, kLogger) << "Received " << len << " bytes from peer "
-                       << "(" << this << ")";
+  CLOG(DEBUG, kLogger) << this << ": Received " << len << " bytes from peer";
 }
 
 bool Client::mac(const uint8_t* key,

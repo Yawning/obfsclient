@@ -139,9 +139,8 @@ void Socks5Server::on_new_connection(evutil_socket_t sock,
   if (session == nullptr) {
     evutil_closesocket(sock);
   } else {
-    CLOG(INFO, kLogger) << "New client connection "
-                        << "(" << this << ": " << client_addr << " -> "
-                               << listener_addr_str_ << ")";
+    CLOG(INFO, kLogger) << session << ": New client connection "
+                        << client_addr << " -> " << listener_addr_str_;
     sessions_.push_back(::std::unique_ptr<Session>(session));
   }
 }
@@ -252,8 +251,7 @@ bool Socks5Server::Session::send_socks5_response(const Reply reply) {
       }
       default:
         // This should never happen
-        CLOG(ERROR, kLogger) << "getsockname() returned a invalid address, closing "
-                             << "(" << this << ")";
+        CLOG(ERROR, kLogger) << this << ": getsockname() returned a invalid address, closing";
 
         resp[1] = Reply::kGENERAL_FAILURE;
         goto error_reply;
@@ -271,8 +269,7 @@ error_reply:
     resp_len = 10;
     resp[3] = AddressType::kIPv4;
 
-    CLOG(DEBUG, kLogger) << "Sending SOCKS error: " << resp[1] << " "
-                         << "(" << this << ")";
+    CLOG(DEBUG, kLogger) << this << ": Sending SOCKS error: " << resp[1];
 
     // Want to close as soon as the buffer is empty
     outgoing_valid_ = false;
@@ -280,15 +277,13 @@ error_reply:
   }
 
   if (0 != ::bufferevent_write(incoming_, resp, resp_len)) {
-    CLOG(ERROR, kLogger) << "Failed to write SOCKS response, closing "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to write SOCKS response, closing";
     server_.close_session(this);
     return false;
   } else if (state_ == State::kESTABLISHED) {
     ::bufferevent_enable(incoming_, EV_READ);
-    CLOG(INFO, kLogger) << "Connection setup complete "
-                        << "(" << this << ": " << client_addr_str_ << " <-> "
-                               << remote_addr_str_ << ")";
+    CLOG(INFO, kLogger) << this << ": Connection setup complete "
+                        << client_addr_str_ << " <-> " << remote_addr_str_;
     return true;
   }
 
@@ -338,15 +333,13 @@ void Socks5Server::Session::incoming_read_methods_cb() {
 
   const uint8_t* p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
-    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to pullup buffer";
     server_.close_session(this);
     return;
   }
 
   if (p[0] != kSocksVersion) {
-    CLOG(WARNING, kLogger) << "Invalid SOCKS protocol version: " << p[0] << " "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": Invalid SOCKS protocol version: " << p[0];
     server_.close_session(this);
     return;
   }
@@ -372,21 +365,18 @@ void Socks5Server::Session::incoming_read_methods_cb() {
     if (can_username_password)
       auth_method_ = AuthMethod::kUSERNAME_PASSWORD;
     else {
-      CLOG(WARNING, kLogger) << "Failed to negotiate compatible auth "
-                             << "(" << this << ")";
+      CLOG(WARNING, kLogger) << this << ": Failed to negotiate compatible auth";
       server_.close_session(this);
       return;
     }
   } else if (can_none)
     auth_method_ = AuthMethod::kNONE_REQUIRED;
 
-  CLOG(DEBUG, kLogger) << "Negotiated auth method: " << auth_method_ << " "
-                       << "(" << this << ")";
+  CLOG(DEBUG, kLogger) << this << ": Negotiated auth method: " << auth_method_;
 
   uint8_t method[2] = { kSocksVersion, static_cast<uint8_t>(auth_method_) };
   if (0 != ::bufferevent_write(incoming_, method, sizeof(method))) {
-    CLOG(ERROR, kLogger) << "Failed to write auth method, closing "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to write auth method, closing";
     server_.close_session(this);
     return;
   }
@@ -400,8 +390,7 @@ void Socks5Server::Session::incoming_read_methods_cb() {
     state_ = State::kAUTHENTICATING;
     break;
   default:
-    CLOG(WARNING, kLogger) << "No suitable auth methods, closing" << " "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": No suitable auth methods, closing";
     state_ = State::kFLUSHING_INCOMING;
   }
 }
@@ -427,14 +416,12 @@ void Socks5Server::Session::incoming_read_auth_cb() {
 
   const uint8_t* p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
-    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to pullup buffer";
 out_fail:
     // Send a failure response
     const uint8_t resp[2] = { 0x01, 0xff };
     if (0 != ::bufferevent_write(incoming_, resp, sizeof(resp))) {
-      CLOG(ERROR, kLogger) << "Failed to write auth response, closing "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to write auth response, closing";
       server_.close_session(this);
       return;
     }
@@ -445,8 +432,7 @@ out_fail:
 
   // Version
   if (p[0] != 0x01) {
-    CLOG(WARNING, kLogger) << "Invalid SOCKS auth version: " << p[0] << " "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": Invalid SOCKS auth version: " << p[0];
     goto out_fail;
   }
 
@@ -463,18 +449,15 @@ out_fail:
   const uint8_t* passwd = (plen > 0) ? p + 2 + ulen + 1 : nullptr;
 
   if (!on_client_authenticate(uname, ulen, passwd, plen)) {
-    CLOG(WARNING, kLogger) << "Authentication failed, closing "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": Authentication failed, closing";
     goto out_fail;
   }
 
-  CLOG(DEBUG, kLogger) << "Authenticated " 
-                       << "(" << this << ")";
+  CLOG(DEBUG, kLogger) << this << ": Authenticated";
 
   const uint8_t resp[2] = { 0x01, 0x00 };
   if (0 != ::bufferevent_write(incoming_, resp, sizeof(resp))) {
-    CLOG(ERROR, kLogger) << "Failed to write auth response, closing "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to write auth response, closing";
     server_.close_session(this);
     return;
   }
@@ -503,27 +486,23 @@ void Socks5Server::Session::incoming_read_request_cb() {
 
   const uint8_t* p = ::evbuffer_pullup(buf, len);
   if (p == nullptr) {
-    CLOG(ERROR, kLogger) << "Failed to pullup buffer "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to pullup buffer";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
 
   if (p[0] != kSocksVersion) {
-    CLOG(WARNING, kLogger) << "Invalid SOCKS protocol version: " << p[0] << " "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": Invalid SOCKS protocol version: " << p[0];
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
   if (p[1] != Command::kCONNECT) {
-    CLOG(WARNING, kLogger) << "Invalid SOCKS command: " << p[1] << " "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": Invalid SOCKS command: " << p[1];
     send_socks5_response(Reply::kCOMMAND_NOT_SUPP);
     return;
   }
   if (p[2] != 0x00) {
-    CLOG(WARNING, kLogger) << "Invalid SOCKS reserved field: " << p[2] << " "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": Invalid SOCKS reserved field: " << p[2];
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -548,8 +527,7 @@ void Socks5Server::Session::incoming_read_request_cb() {
     ::std::memcpy(&v6addr->sin6_port, p + 4 + 16, 2);
     to_drain += 18;
   } else {
-    CLOG(WARNING, kLogger) << "Invalid SOCKS address type: " << p[3] << " "
-                           << "(" << this << ")";
+    CLOG(WARNING, kLogger) << this << ": Invalid SOCKS address type: " << p[3];
     send_socks5_response(Reply::kADDR_NOT_SUPP);
     return;
   }
@@ -557,15 +535,13 @@ void Socks5Server::Session::incoming_read_request_cb() {
   remote_addr_str_ = addr_to_string(reinterpret_cast<struct sockaddr*>(&remote_addr_),
                                 scrub_addrs_);
 
-  CLOG(INFO, kLogger) << "Connecting to peer "
-                      << "(" << this << ": " << client_addr_str_ << " <-> "
-                             << remote_addr_str_ << ")";
+  CLOG(INFO, kLogger) << this << ": Connecting to peer "
+                      << client_addr_str_ << " <-> " << remote_addr_str_;
 
   // Connect
   ::evbuffer_drain(buf, to_drain);
   if (!outgoing_connect()) {
-    CLOG(ERROR, kLogger) << "Failed to start connecting, closing "
-                         << "(" << this << ")";
+    CLOG(ERROR, kLogger) << this << ": Failed to start connecting, closing";
     send_socks5_response(Reply::kGENERAL_FAILURE);
     return;
   }
@@ -575,7 +551,7 @@ void Socks5Server::Session::incoming_read_request_cb() {
 
 void Socks5Server::Session::connect_timeout_cb() {
   SL_ASSERT(state_ == State::kCONNECTING);
-  CLOG(WARNING, kLogger) << "Session handshake timeout (" << this << ")";
+  CLOG(WARNING, kLogger) << this << ": Session handshake timeout";
   on_connect_timeout();
 }
 
@@ -583,7 +559,7 @@ void Socks5Server::Session::incoming_write_cb() {
   if (state_ == State::kESTABLISHED)
     on_incoming_drained();
   else if (state_ == State::kFLUSHING_INCOMING) {
-    CLOG(INFO, kLogger) << "Session closed (" << this << ")";
+    CLOG(INFO, kLogger) << this << ": Session closed";
     server_.close_session(this);
     return;
   }
@@ -596,13 +572,12 @@ void Socks5Server::Session::incoming_event_cb(const short events) {
     if (!outgoing_valid_ || (::evbuffer_get_length(buf) == 0 &&
                              !on_outgoing_flush())) {
       // Outgoing is invalid or fully flushed, done!
-      CLOG(INFO, kLogger) << "Session closed (" << this << ")";
+      CLOG(INFO, kLogger) << this << ": Session closed";
       server_.close_session(this);
       return;
     } else {
       // Need to attempt to flush outgoing first
-      CLOG(DEBUG, kLogger) << "Local connection closed, flushing remote "
-                           << "(" << this << ")";
+      CLOG(DEBUG, kLogger) << this << ": Local connection closed, flushing remote";
       ::bufferevent_disable(incoming_, EV_READ);
       ::bufferevent_setwatermark(outgoing_, EV_WRITE, 0, 0);
       state_ = State::kFLUSHING_OUTGOING;
@@ -617,27 +592,23 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     const auto err = EVUTIL_SOCKET_ERROR();
     switch (err) {
     case ENETUNREACH:
-      CLOG(WARNING, kLogger) << "Peer network unreachable "
-                             << "(" << this << ": " << client_addr_str_
-                                    << " <-> " << remote_addr_str_ << ")";
+      CLOG(WARNING, kLogger) << this << ": Peer network unreachable "
+                             << client_addr_str_ << " <-> " << remote_addr_str_;
       send_socks5_response(Reply::kNETWORK_UNREACHABLE);
       break;
     case EHOSTUNREACH:
-      CLOG(WARNING, kLogger) << "Peer host unreachable "
-                             << "(" << this << ": " << client_addr_str_
-                                    << " <-> " << remote_addr_str_ << ")";
+      CLOG(WARNING, kLogger) << this << ": Peer host unreachable "
+                             << client_addr_str_ << " <-> " << remote_addr_str_;
       send_socks5_response(Reply::kHOST_UNREACHABLE);
       break;
     case ECONNREFUSED:
-      CLOG(WARNING, kLogger) << "Peer refused connection "
-                             << "(" << this << ": " << client_addr_str_
-                                    << " <-> " << remote_addr_str_ << ")";
+      CLOG(WARNING, kLogger) << this << ": Peer refused connection "
+                             << client_addr_str_ << " <-> " << remote_addr_str_;
       send_socks5_response(Reply::kCONNECTION_REFUSED);
       break;
     default:
-      CLOG(WARNING, kLogger) << "Peer connection failed: " << err
-                             << "(" << this << ": " << client_addr_str_
-                                    << " <-> " << remote_addr_str_ << ")";
+      CLOG(WARNING, kLogger) << this << ": Peer connection failed: " << err << " "
+                             << client_addr_str_ << " <-> " << remote_addr_str_;
       send_socks5_response(Reply::kGENERAL_FAILURE);
     }
 
@@ -653,8 +624,7 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     SL_ASSERT(connect_timer_ev_ == nullptr);
     connect_timer_ev_ = evtimer_new(base_, timeoutcb, this);
     if (connect_timer_ev_ == nullptr) {
-      CLOG(ERROR, kLogger) << "Failed to allocate timeout timer, closing "
-                           << "(" << this << ")";
+      CLOG(ERROR, kLogger) << this << ": Failed to allocate timeout timer, closing";
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
@@ -666,8 +636,7 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     tv.tv_sec = kConnectTimeout + alpha(rand);
     tv.tv_usec = 0;
     evtimer_add(connect_timer_ev_, &tv);
-    CLOG(INFO, kLogger) << "Randomizing connect timeout: " << tv.tv_sec << " sec "
-                        << "(" << this << ")";
+    CLOG(INFO, kLogger) << this << ": Randomizing connect timeout: " << tv.tv_sec << " sec";
 
     // Setup the bufferevents
     bufferevent_data_cb readcb = [](struct bufferevent* bev,
@@ -686,9 +655,8 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     ::bufferevent_enable(outgoing_, EV_READ | EV_WRITE);
     ::bufferevent_setcb(outgoing_, readcb, writecb, eventcb, this);
 
-    CLOG(DEBUG, kLogger) << "Connected "
-                         << "(" << this << ": " << client_addr_str_ << " <-> "
-                                << remote_addr_str_ << ")";
+    CLOG(DEBUG, kLogger) << this << ": Connected "
+                         << client_addr_str_ << " <-> " << remote_addr_str_;
 
     outgoing_valid_ = true;
     on_outgoing_connected();
@@ -718,7 +686,7 @@ void Socks5Server::Session::outgoing_write_cb() {
   if (state_ == State::kCONNECTING || state_ == State::kESTABLISHED)
     on_outgoing_drained();
   else if (state_ == State::kFLUSHING_OUTGOING && on_outgoing_flush()) {
-    CLOG(INFO, kLogger) << "Session closed (" << this << ")";
+    CLOG(INFO, kLogger) << this << ": Session closed";
     server_.close_session(this);
     return;
   }
@@ -730,13 +698,12 @@ void Socks5Server::Session::outgoing_event_cb(const short events) {
     outgoing_valid_ = false;
     if (!incoming_valid_ || ::evbuffer_get_length(buf) == 0) {
       // Incoming is invalid or fully flushed, done!
-      CLOG(INFO, kLogger) << "Session closed (" << this << ")";
+      CLOG(INFO, kLogger) << this << ": Session closed";
       server_.close_session(this);
       return;
     } else {
       // Need to attempt to flush incoming first
-      CLOG(DEBUG, kLogger) << "Remote connection closed, flushing local "
-                           << "(" << this << ")";
+      CLOG(DEBUG, kLogger) << this << ": Remote connection closed, flushing local";
       ::bufferevent_disable(outgoing_, EV_READ);
       ::bufferevent_setwatermark(incoming_, EV_WRITE, 0, 0);
       state_ = State::kFLUSHING_INCOMING;
