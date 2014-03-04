@@ -32,10 +32,12 @@
  */
 
 #include <cstring>
+#include <random>
 
 #include <event2/buffer.h>
 
 #include "schwanenlied/socks5_server.h"
+#include "schwanenlied/crypto/rand_openssl.h"
 
 namespace schwanenlied {
 
@@ -642,7 +644,7 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     // Flush the reply
     outgoing_event_cb(events);
   } else if (events & BEV_EVENT_CONNECTED) {
-    // Arm the handshake timeout
+    // Initialize the handshake timeout
     event_callback_fn timeoutcb = [](evutil_socket_t sock,
                                      short which,
                                      void* arg) {
@@ -656,10 +658,16 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
       send_socks5_response(Reply::kGENERAL_FAILURE);
       return;
     }
+
+    // Arm the handshake timeout
+    crypto::RandOpenSSL rand;
+    ::std::uniform_int_distribution<uint32_t> alpha(0, kConnectTimeout);
     struct timeval tv;
-    tv.tv_sec = kConnectTimeout;
+    tv.tv_sec = kConnectTimeout + alpha(rand);
     tv.tv_usec = 0;
     evtimer_add(connect_timer_ev_, &tv);
+    CLOG(INFO, kLogger) << "Randomizing connect timeout: " << tv.tv_sec << " sec "
+                        << "(" << this << ")";
 
     // Setup the bufferevents
     bufferevent_data_cb readcb = [](struct bufferevent* bev,
