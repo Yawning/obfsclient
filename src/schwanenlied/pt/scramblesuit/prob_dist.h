@@ -60,8 +60,7 @@ class ProbDist {
    */
   ProbDist(const uint32_t sample_min,
            const uint32_t sample_max) :
-      bucket_dist_(kMinBuckets, kMaxBuckets),
-      weight_dist_(0, 100) {
+      bucket_dist_(kMinBuckets, kMaxBuckets) {
     reset(nullptr, 0, sample_min, sample_max);
   }
 
@@ -108,8 +107,6 @@ class ProbDist {
 
   /** The uniform distribution for generating the number of buckets */
   ::std::uniform_int_distribution<int> bucket_dist_;
-  /** The uniform distribution for generating the probabilities */
-  ::std::uniform_int_distribution<int> weight_dist_;
 
   /** The CTR_DRBG-AES-128 PRNG */
   crypto::RandCtrDrbg rng_;

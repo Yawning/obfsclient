@@ -50,7 +50,6 @@ void ProbDist::reset(const uint8_t* seed,
   if (seed != nullptr && seed_len > 0) {
     rng_.seed(seed, seed_len);
     bucket_dist_.reset();
-    weight_dist_.reset();
   }
 
   const size_t range = sample_max - sample_min;
@@ -66,11 +65,19 @@ void ProbDist::reset(const uint8_t* seed,
   values_.resize(n);
 
   // Generate weights
+  int to_distribute = 10000;  // 0.0001 granularity
   ::std::vector<int> weights(values_.size());
-  for (int& val : weights)
-    val = weight_dist_(rng_);
+  for (int& val : weights) {
+    ::std::uniform_int_distribution<int> dist(0, to_distribute);
+    int weight = dist(rng_);
+    to_distribute -= weight;
+    val = weight;
+    if (to_distribute == 0)
+      break;
+  }
+  weights.at(weights.size() - 1) += to_distribute;
 
-  // Setup the disctete distribution
+  // Setup the discrete distribution
   typedef ::std::discrete_distribution<>::param_type param_type;
   prob_dist_.param(param_type(weights.begin(), weights.end()));
 
@@ -82,11 +89,10 @@ const ::std::string ProbDist::to_string() const {
   const auto probs = prob_dist_.probabilities();
   ::std::ostringstream stream;
 
-  stream << ::std::endl;
   for (size_t i = 0; i < values_.size(); i++) {
-    stream << "  " << values_.at(i) << ": " << probs.at(i);
-    if (i != values_.size() - 1)
-     stream << ::std::endl;
+    // Skip buckets with probability 0
+    if (probs.at(i) != 0.0d)
+      stream << ' ' << values_.at(i) << ": " << probs.at(i) << ' ';
   }
 
   return stream.str();
