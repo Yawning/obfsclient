@@ -17,13 +17,10 @@ common_sources = src/schwanenlied/crypto/base32.cc \
 	src/schwanenlied/pt/obfs2/client.cc \
 	src/schwanenlied/pt/obfs3/client.cc \
 	src/schwanenlied/pt/scramblesuit/client.cc \
+        src/schwanenlied/pt/scramblesuit/session_ticket_handshake.cc \
 	src/schwanenlied/pt/scramblesuit/uniform_dh_handshake.cc \
         src/schwanenlied/pt/scramblesuit/prob_dist.cc \
 	src/schwanenlied/socks5_server.cc
-
-if ENABLE_SCRAMBLESUIT_SESSION_TICKET
-common_sources += src/schwanenlied/pt/scramblesuit/session_ticket_handshake.cc
-endif
 
 # obfsclient
 bin_PROGRAMS = obfsclient
