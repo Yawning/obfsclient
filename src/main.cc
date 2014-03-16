@@ -31,6 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <iostream>
 #include <list>
 #include <memory>
 
@@ -57,6 +58,7 @@ namespace {
 enum kOptionIndex {
   kUNKNOWN,
   kHELP,
+  kVERSION,
   kDEBUG,
   kUNSAFE_LOGS,
   kWAIT_FOR_DEBUGGER
@@ -67,6 +69,8 @@ const ::option::Descriptor kUsage[] = {
     "usage: obfsclient [OPTION]" },
   { kHELP, 0, "", "help", ::option::Arg::Optional,
     "  --help              Print usage." },
+  { kVERSION, 0, "", "version", ::option::Arg::Optional,
+    "  --version           Print version." },
   { kDEBUG, 0, "", "debug", ::option::Arg::Optional,
     "  --debug             Enable debugging." },
   { kUNSAFE_LOGS, 0, "", "unsafe-logs", ::option::Arg::Optional,
@@ -197,6 +201,10 @@ int main(int argc, char* argv[]) {
     ::option::printUsage(std::cout, kUsage);
     return 0;
   }
+  if (options[kVERSION]) {
+    ::std::cout << PACKAGE_NAME << " " << PACKAGE_VERSION << ::std::endl;
+    return 0;
+  }
   const bool debug = options[kDEBUG];
   const bool scrub_ips = !options[kUNSAFE_LOGS];
   volatile bool wait_for_debugger = options[kWAIT_FOR_DEBUGGER];
@@ -228,7 +236,8 @@ int main(int argc, char* argv[]) {
   init_logging(state_dir, debug);
 
   // Log a banner
-  CLOG(INFO, kLogger) << "obfsclient - Initialized (PID: " << ::getpid() << ")";
+  CLOG(INFO, kLogger) << "obfsclient " << PACKAGE_VERSION <<
+                         " - Initialized (PID: " << ::getpid() << ")";
 
   // Attempt to initialize the supported PTs
   ::std::list< ::std::unique_ptr<Socks5Factory>> factories;
