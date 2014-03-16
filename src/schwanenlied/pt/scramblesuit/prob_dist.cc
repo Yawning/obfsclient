@@ -91,7 +91,7 @@ const ::std::string ProbDist::to_string() const {
 
   for (size_t i = 0; i < values_.size(); i++) {
     // Skip buckets with probability 0
-    if (probs.at(i) != 0.0d)
+    if (probs.at(i) != 0.0L)
       stream << ' ' << values_.at(i) << ": " << probs.at(i) << ' ';
   }
 
