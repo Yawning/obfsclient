@@ -43,6 +43,23 @@ AX_CHECK_OPENSSL(, AC_MSG_ERROR(Can not find OpenSSL.  This is required.))
 PKG_CHECK_MODULES([libevent], [libevent >= 2.0.2])
 PKG_CHECK_MODULES([liballium], [liballium-1.0 >= 0.0.1])
 
+# Ensure that pkg-config (or the user) actually found/specified the correct
+# paths for the dependencies instead of taking PKG_CHECK_MODULE's word for it.
+oldCPPFLAGS=$CPPFLAGS
+oldLDFLAGS=$LDFLAGS
+CPPFLAGS="$CPPFLAGS $liballium_CFLAGS $libevent_CFLAGS"
+LDFLAGS="$LDFLAGS $liballium_LIBS $libevent_LIBS"
+AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <allium/allium.h>],
+                                [(void)allium_ptcfg_init();])],
+               [],
+               [AC_MSG_ERROR([liballium headers or library missing.])])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <event2/event.h>],
+                                [(void)event_base_dispatch(NULL);])],
+               [],
+               [AC_MSG_ERROR([libevent2 headers or libraries missing.])])
+CPPFLAGS=$oldCPPFLAGS
+LDFLAGS=$oldLDFLAGS
+
 # Ensure that the barest minimum of stuff works
 #  - Not going to bother checking for the crap that gtest want
 AX_CXX_COMPILE_STDCXX_11(noext,mandatory)
