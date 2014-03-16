@@ -64,7 +64,7 @@ bool Socks5Server::bind() {
   // Initialize a sockaddr for the server socket
   listener_addr_.sin_family = AF_INET;
   listener_addr_.sin_port = 0;
-  evutil_inet_pton(AF_INET, "127.0.0.1", &listener_addr_.sin_addr);
+  listener_addr_.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
   // Initialize the on connect callback, shamelessly abusing a lambda
   evconnlistener_cb cb = [](struct evconnlistener* listener,

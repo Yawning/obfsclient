@@ -61,7 +61,7 @@ namespace schwanenlied {
  *  * Attempting to flush queued data when either of the connections is closed
  *
  * Current limitations:
- *  * It will *ALWAYS* bind to 127.0.0.1:RandomPort
+ *  * It will *ALWAYS* bind to <IPv4 loopback address>:RandomPort
  *  * Only CONNECT (establish TCP/IP stream) is supported
  *  * Only ATYP 0x01/0x03 are supported (no FQDN)
  *  * GSSAPI auth will never be supported
