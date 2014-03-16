@@ -1,2 +1,5 @@
+Changes in version 0.0.2 - UNRELEASED
+ - Darwin build fixes, pointed out by Jeroen Massar.
+
 Changes in version 0.0.1 - 2014-03-16
  - Initial release.
