@@ -12,7 +12,17 @@ AC_PREREQ([2.69])
 AM_INIT_AUTOMAKE([1.10 no-define foreign -Wall])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
+AC_CANONICAL_HOST
 AC_PROG_CXX
+
+# Host specific compiler stuff
+case "$host_os" in
+  darwin*)
+    # Ignore deprecation warnings on Darwin because the system OpenSSL is
+    # deprecated in OSX >= 10.7.
+    CXXFLAGS="$CXXFLAGS -Wno-deprecated-declarations"
+    ;;
+esac
 
 AC_ARG_ENABLE(scramblesuit_iat,
               AS_HELP_STRING([--enable-scramblesuit-iat],
