@@ -17,6 +17,11 @@ AC_PROG_CXX
 
 # Host specific compiler stuff
 case "$host_os" in
+  freebsd8* | freebsd9.0*)
+    # FreeBSD < 9.1 does not have the appropriate goo in sys/cdefs.h to expose
+    # the C99 limits when using a C++11 compiler.
+    CXXFLAGS="$CXXFLAGS -D__STDC_LIMIT_MACROS -D__LONG_LONG_SUPPORTED"
+    ;;
   darwin*)
     # Ignore deprecation warnings on Darwin because the system OpenSSL is
     # deprecated in OSX >= 10.7.

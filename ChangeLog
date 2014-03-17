@@ -1,5 +1,6 @@
 Changes in version 0.0.2 - UNRELEASED
  - Darwin build fixes, pointed out by Jeroen Massar.
+ - FreeBSD 8.x/9.0 build fix, pointed out by Fabian Keil.
 
 Changes in version 0.0.1 - 2014-03-16
  - Initial release.
