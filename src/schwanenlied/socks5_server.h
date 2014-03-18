@@ -316,8 +316,12 @@ class Socks5Server {
     /**
      * Open a TCP/IP connection to remote_addr_
      *
+     * @note Even if the bufferevent_socket_connect() call fails, this will
+     * return true as the failure state for that is handled in
+     * outgoing_connect_cb()
+     *
      * @returns true  - Success
-     * @returns false - Failure
+     * @returns false - Critical failure
      */
     bool outgoing_connect();
     /** @} */

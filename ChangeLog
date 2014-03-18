@@ -1,4 +1,6 @@
 Changes in version 0.0.2 - UNRELEASED
+ - Fixed an assertion  that occured if the outgoing connection immediately
+   failed (Eg: Network interface being down).
  - Darwin build fixes, pointed out by Jeroen Massar.
  - FreeBSD 8.x/9.0 build fix, pointed out by Fabian Keil.
 

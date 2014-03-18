@@ -252,24 +252,20 @@ bool Socks5Server::Session::send_socks5_response(const Reply reply) {
       default:
         // This should never happen
         CLOG(ERROR, kLogger) << this << ": getsockname() returned a invalid address, closing";
-
-        resp[1] = Reply::kGENERAL_FAILURE;
-        goto error_reply;
+        return send_socks5_response(Reply::kGENERAL_FAILURE);
       }
 
       state_ = State::kESTABLISHED;
     } else {
       CPLOG(ERROR, kLogger) << "Failed to getsockname() outgoing";
-      resp[1] = Reply::kGENERAL_FAILURE;
-      goto error_reply;
+      return send_socks5_response(Reply::kGENERAL_FAILURE);
     }
   } else {
-error_reply:
     /* Just send a IPv4 address back on failure */
     resp_len = 10;
     resp[3] = AddressType::kIPv4;
 
-    CLOG(DEBUG, kLogger) << this << ": Sending SOCKS error: " << resp[1];
+    CLOG(DEBUG, kLogger) << this << ": Sending SOCKS error: " << static_cast<int>(resp[1]);
 
     // Want to close as soon as the buffer is empty
     outgoing_valid_ = false;
@@ -728,11 +724,13 @@ bool Socks5Server::Session::outgoing_connect() {
   };
   ::bufferevent_setcb(outgoing_, nullptr, nullptr, eventcb, this);
 
-  int ret = ::bufferevent_socket_connect(outgoing_, reinterpret_cast<struct
-                                         sockaddr*>(&remote_addr_),
-                                         remote_addr_len_);
+  // Return value is ignored since the callback will get invoked
+  ::bufferevent_socket_connect(outgoing_,
+                               reinterpret_cast<struct sockaddr*>(&remote_addr_),
+                               remote_addr_len_);
+
   state_ = State::kCONNECTING;
-  return ret == 0;
+  return true;
 }
 
 } // namespace schwanenlied
