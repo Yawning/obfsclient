@@ -602,6 +602,11 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
                              << client_addr_str_ << " <-> " << remote_addr_str_;
       send_socks5_response(Reply::kCONNECTION_REFUSED);
       break;
+    case ETIMEDOUT:
+      CLOG(WARNING, kLogger) << this << ": Peer connection timedout "
+                             << client_addr_str_ << " <-> " << remote_addr_str_;
+      send_socks5_response(Reply::kTTL_EXPIRED);
+      break;
     default:
       CLOG(WARNING, kLogger) << this << ": Peer connection failed: " << err << " "
                              << client_addr_str_ << " <-> " << remote_addr_str_;
