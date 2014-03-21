@@ -34,6 +34,11 @@
 #ifndef SCHWANENLIED_PT_SCRAMBLESUIT_CLIENT_H__
 #define SCHWANENLIED_PT_SCRAMBLESUIT_CLIENT_H__
 
+#define SCRAMBLESUIT_LOGGER "scramblesuit"
+#ifdef SCRAMBLESUIT_CLIENT_IMPL
+#define _LOGGER SCRAMBLESUIT_LOGGER
+#endif
+
 #include <array>
 
 #include <event2/event.h>
@@ -78,7 +83,7 @@ class Client : public Socks5Server::Session {
          const ::std::string& addr,
          const bool scrub_addrs) :
       Session(server, base, sock, addr, true, scrub_addrs),
-      logger_(::el::Loggers::getLogger(kLogger)),
+      logger_(::el::Loggers::getLogger(SCRAMBLESUIT_LOGGER)),
       handshake_(HandshakeMethod::kINVALID),
       packet_len_rng_(kHeaderLength, kMaxFrameLength),
 #ifdef ENABLE_SCRAMBLESUIT_IAT
@@ -118,9 +123,6 @@ class Client : public Socks5Server::Session {
  private:
   Client(const Client&) = delete;
   void operator=(const Client&) = delete;
-
-  /** The scrablesuit log id */
-  static constexpr char kLogger[] = "scramblesuit";
 
   /** @{ */
   /** k_B length */

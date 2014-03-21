@@ -34,6 +34,11 @@
 #ifndef SCHWANENLIED_PT_OBFS3_CLIENT_H__
 #define SCHWANENLIED_PT_OBFS3_CLIENT_H__
 
+#define OBFS3_LOGGER "obfs3"
+#ifdef OBFS3_CLIENT_IMPL
+#define _LOGGER OBFS3_LOGGER
+#endif
+
 #include <random>
 
 #include "schwanenlied/common.h"
@@ -78,7 +83,7 @@ class Client : public Socks5Server::Session {
          const ::std::string& addr,
          const bool scrub_addrs) :
       Session(server, base, sock, addr, false, scrub_addrs),
-      logger_(::el::Loggers::getLogger(kLogger)),
+      logger_(::el::Loggers::getLogger(OBFS3_LOGGER)),
       sent_magic_(false),
       received_magic_(false),
       initiator_magic_(crypto::HmacSha256::kDigestLength, 0),
@@ -99,8 +104,6 @@ class Client : public Socks5Server::Session {
  private:
   Client(const Client&) = delete;
   void operator=(const Client&) = delete;
-
-  static constexpr char kLogger[] = "obfs3";    /**< The obfs3 log id */
 
   static constexpr uint16_t kMaxPadding = 8194; /** obfs3 MAX_PADDING */
 

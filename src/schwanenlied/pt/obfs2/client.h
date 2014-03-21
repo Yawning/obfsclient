@@ -34,6 +34,11 @@
 #ifndef SCHWANENLIED_PT_OBFS2_CLIENT_H__
 #define SCHWANENLIED_PT_OBFS2_CLIENT_H__
 
+#define OBFS2_LOGGER "obfs2"
+#ifdef OBFS2_CLIENT_IMPL
+#define _LOGGER OBFS2_LOGGER
+#endif
+
 #include <random>
 
 #include "schwanenlied/common.h"
@@ -76,7 +81,7 @@ class Client : public Socks5Server::Session {
          const ::std::string& addr,
          const bool scrub_addrs) :
       Session(server, base, sock, addr, false, scrub_addrs),
-      logger_(::el::Loggers::getLogger(kLogger)),
+      logger_(::el::Loggers::getLogger(OBFS2_LOGGER)),
       received_seed_hdr_(false),
       resp_pad_len_(0),
       init_seed_(kSeedLength, 0),
@@ -97,8 +102,6 @@ class Client : public Socks5Server::Session {
  private:
   Client(const Client&) = delete;
   void operator=(const Client&) = delete;
-
-  static constexpr char kLogger[] = "obfs2";  /**< The obfs2 log id */
 
   /** @{ */
   static constexpr uint32_t kMagicValue = 0x2BF5CA7E; /**< obfs2 MAGIC_VALUE */

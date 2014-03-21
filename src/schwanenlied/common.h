@@ -68,7 +68,7 @@ do {                                                                    \
 } while(0)
 
 /**
- * An assert(0) replacement that will give more useful information
+ * An abort() replacement that will give more useful information
  *
  * This is for things like code that should never be reached.
  */

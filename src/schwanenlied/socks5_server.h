@@ -34,6 +34,11 @@
 #ifndef SCHWANENLIED_SOCKS5_SERVER_H__
 #define SCHWANENLIED_SOCKS5_SERVER_H__
 
+#define SOCKS5_LOGGER "socks5"
+#ifdef SOCKS5_SERVER_IMPL
+#define _LOGGER SOCKS5_LOGGER
+#endif
+
 #include <netinet/in.h>
 
 #include <list>
@@ -203,6 +208,11 @@ class Socks5Server {
      * @returns false - Session torn down
      */
     bool send_socks5_response(const Reply reply);
+
+    /**
+     * Return a string representation of SOCKSv5 Session state
+     */
+    const char* state_string() const;
 
     /** @{ */
     /** The Socks5Server */
@@ -374,7 +384,7 @@ class Socks5Server {
       factory_(factory),
       base_(base),
       scrub_addrs_(scrub_addrs),
-      logger_(::el::Loggers::getLogger(kLogger)),
+      logger_(::el::Loggers::getLogger(SOCKS5_LOGGER)),
       listener_(nullptr),
       listener_addr_(),
       listener_addr_str_() {}
@@ -467,8 +477,6 @@ class Socks5Server {
  private:
   Socks5Server(const Socks5Server&) = delete;
   void operator=(const Socks5Server&) = delete;
-
-  static constexpr char kLogger[] = "socks5"; /**< The SOCKS server log id */
 
   /** The SOCKS server libevent2 evconnlistener callback */
   void on_new_connection(evutil_socket_t sock,

@@ -31,6 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _LOGGER "main"
+
 #include <iostream>
 #include <list>
 #include <memory>
@@ -87,7 +89,6 @@ using Obfs3Factory = schwanenlied::pt::obfs3::Client::SessionFactory;
 using ScrambleSuitFactory = schwanenlied::pt::scramblesuit::Client::SessionFactory;
 
 constexpr char kLogFileName[] = "obfsclient.log";
-constexpr char kLogger[] = "main";
 
 constexpr char kObfs2MethodName[] = "obfs2";
 constexpr char kObfs3MethodName[] = "obfs3";
@@ -122,7 +123,7 @@ void init_logging(const ::std::string& path,
     conf.set(::el::Level::Debug, ::el::ConfigurationType::Enabled, "false");
   ::el::Helpers::addFlag(el::LoggingFlag::ImmediateFlush);
   ::el::Loggers::setDefaultConfigurations(conf, true);
-  (void)::el::Loggers::getLogger(kLogger);
+  (void)::el::Loggers::getLogger(_LOGGER);
 }
 
 bool init_libevent() {
@@ -143,7 +144,7 @@ bool init_pt(const allium_ptcfg* cfg,
     return false;
 
   if (!init_libevent()) {
-    CLOG(ERROR, kLogger) << "Failed to initialize a libevent event_base";
+    LOG(ERROR) << "Failed to initialize a libevent event_base";
     ::allium_ptcfg_method_error(cfg, name, "event_base_new()");
     return false;
   }
@@ -152,7 +153,7 @@ bool init_pt(const allium_ptcfg* cfg,
   Socks5Server* listener = new Socks5Server(state_dir, factory, ev_base,
                                             scrub_addrs);
   if (!listener->bind()) {
-    CLOG(ERROR, kLogger) << "Failed to bind() a SOCKSv5 listener";
+    LOG(ERROR) << "Failed to bind() a SOCKSv5 listener";
     ::allium_ptcfg_method_error(cfg, name, "Socks5::bind()");
 out_free:
     delete factory;
@@ -162,7 +163,7 @@ out_free:
 
   struct sockaddr_in socks_addr;
   if (!listener->addr(socks_addr)) {
-    CLOG(ERROR, kLogger) << "Failed to query the SOCKSv5 address";
+    LOG(ERROR) << "Failed to query the SOCKSv5 address";
     ::allium_ptcfg_method_error(cfg, name, "Socks5::addr()");
     goto out_free;
   }
@@ -170,11 +171,11 @@ out_free:
   factories.push_back(::std::unique_ptr<Socks5Factory>(factory));
   listeners.push_back(::std::unique_ptr<Socks5Server>(listener));
 
-  CLOG(INFO, kLogger) << "SOCKSv5 Listener: "
-                      << Socks5Server::addr_to_string(reinterpret_cast<struct
-                                                      sockaddr*>(&socks_addr),
-                                                      false)
-                      << " " << name ;
+  LOG(INFO) << "SOCKSv5 Listener: "
+            << Socks5Server::addr_to_string(reinterpret_cast<struct
+                                            sockaddr*>(&socks_addr),
+                                            false)
+            << " " << name ;
 
   ::allium_ptcfg_cmethod_report(cfg, name, 5,
                                 reinterpret_cast<struct sockaddr*>(&socks_addr),
@@ -236,8 +237,8 @@ int main(int argc, char* argv[]) {
   init_logging(state_dir, debug);
 
   // Log a banner
-  CLOG(INFO, kLogger) << "obfsclient " << PACKAGE_VERSION <<
-                         " - Initialized (PID: " << ::getpid() << ")";
+  LOG(INFO) << "obfsclient " << PACKAGE_VERSION
+            << " - Initialized (PID: " << ::getpid() << ")";
 
   // Attempt to initialize the supported PTs
   ::std::list< ::std::unique_ptr<Socks5Factory>> factories;
@@ -256,7 +257,10 @@ int main(int argc, char* argv[]) {
   ::allium_ptcfg_methods_done(cfg);
   ::allium_ptcfg_free(cfg);
 
-  SL_ASSERT(factories.size() == listeners.size());
+  CHECK_EQ(factories.size(), listeners.size())
+      << "Factory count should match listener count: "
+      << factories.size() << "!=" << listeners.size();
+
   if (dispatch_loop) {
     // Install a SIGINT handler
     event_callback_fn cb = [](evutil_socket_t sock,
@@ -267,12 +271,12 @@ int main(int argc, char* argv[]) {
       nr_sigints++;
       switch (nr_sigints) {
       case 1:
-        CLOG(INFO, kLogger) << "Closing all listeners";
+        LOG(INFO) << "Closing all listeners";
         for (auto iter = servers->begin(); iter != servers->end(); ++iter)
           (*iter)->close();
         break;
       case 2:
-        CLOG(INFO, kLogger) << "Closing all sessions";
+        LOG(INFO) << "Closing all sessions";
         // Technically, don't need to do anything because the dtor will do this.
         for (auto iter = servers->begin(); iter != servers->end(); ++iter)
           (*iter)->close_sessions();
@@ -289,10 +293,10 @@ int main(int argc, char* argv[]) {
     ::signal(SIGPIPE, SIG_IGN);
 
     // Run the event loop
-    CLOG(INFO, kLogger) << "Awaiting incoming connections";
+    LOG(INFO) << "Awaiting incoming connections";
     ::event_base_dispatch(ev_base);
   } else
-    CLOG(INFO, kLogger) << "No supported transports found, exiting";
+    LOG(INFO) << "No supported transports found, exiting";
 
   return 0;
 }
