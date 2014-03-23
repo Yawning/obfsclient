@@ -1,4 +1,6 @@
 Changes in version 0.0.2 - UNRELEASED
+ - Use bufferevent_write_buffer to save allocating/copying in obfs2/obfs3.
+   This fixes issue #24.
  - Fix assertions primarily seen on abrupt connection close by disabling all
    reads on transition into the various SOCKS5 FLUSHING states.
  - Cleaned up the logging, and log SOCKS5 assertions to the log file.

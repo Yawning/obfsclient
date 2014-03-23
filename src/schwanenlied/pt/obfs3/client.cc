@@ -125,12 +125,11 @@ void Client::on_incoming_data() {
     server_.close_session(this);
     return;
   }
-  if (::bufferevent_write(outgoing_, p, len) != 0) {
+  if (::bufferevent_write_buffer(outgoing_, buf) != 0) {
     LOG(ERROR) << this << ": Failed to send client payload";
     server_.close_session(this);
     return;
   }
-  ::evbuffer_drain(buf, len);
 
   LOG(DEBUG) << this << ": Sent " << len << " bytes to peer";
 }
@@ -216,12 +215,11 @@ void Client::on_outgoing_data() {
     server_.close_session(this);
     return;
   }
-  if (::bufferevent_write(incoming_, p, len) != 0) {
+  if (::bufferevent_write_buffer(incoming_, buf) != 0) {
     LOG(ERROR) << this << ": Failed to send remote payload";
     server_.close_session(this);
     return;
   }
-  ::evbuffer_drain(buf, len);
 
   LOG(DEBUG) << this << ": Received " << len << " bytes from peer";
 }
