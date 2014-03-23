@@ -565,6 +565,8 @@ void Socks5Server::Session::incoming_read_request_cb() {
   }
 
   ::bufferevent_disable(incoming_, EV_READ);
+  if (outgoing_ != nullptr)
+    ::bufferevent_disable(outgoing_, EV_READ);
 }
 
 void Socks5Server::Session::connect_timeout_cb() {
@@ -599,6 +601,7 @@ void Socks5Server::Session::incoming_event_cb(const short events) {
       // Need to attempt to flush outgoing first
       LOG(DEBUG) << this << ": Local connection closed, flushing remote";
       ::bufferevent_disable(incoming_, EV_READ);
+      ::bufferevent_disable(outgoing_, EV_READ);
       ::bufferevent_setwatermark(outgoing_, EV_WRITE, 0, 0);
       state_ = State::kFLUSHING_OUTGOING;
     }
@@ -730,6 +733,7 @@ void Socks5Server::Session::outgoing_event_cb(const short events) {
     } else {
       // Need to attempt to flush incoming first
       LOG(DEBUG) << this << ": Remote connection closed, flushing local";
+      ::bufferevent_disable(incoming_, EV_READ);
       ::bufferevent_disable(outgoing_, EV_READ);
       ::bufferevent_setwatermark(incoming_, EV_WRITE, 0, 0);
       state_ = State::kFLUSHING_INCOMING;
