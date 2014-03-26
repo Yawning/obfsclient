@@ -323,7 +323,8 @@ void Socks5Server::Session::incoming_read_cb() {
     // Pass it onto the filter
     if (!outgoing_valid_)
       return;
-    on_incoming_data();
+    if (on_incoming_data())
+      incoming_apply_backpressure();
     break;
   default:
     LOG(FATAL) << this << ": incoming_read_cb() Invalid state: " << state_string();
@@ -579,7 +580,7 @@ void Socks5Server::Session::connect_timeout_cb() {
 
 void Socks5Server::Session::incoming_write_cb() {
   if (state_ == State::kESTABLISHED)
-    on_incoming_drained();
+    incoming_apply_backpressure();
   else if (state_ == State::kFLUSHING_INCOMING) {
     LOG(INFO) << this << ": Session closed";
     server_.close_session(this);
@@ -689,6 +690,7 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
 
     outgoing_valid_ = true;
     on_outgoing_connected();
+    return;
   }
 }
 
@@ -704,7 +706,8 @@ void Socks5Server::Session::outgoing_read_cb() {
     // Pass it onto the filter
     if (!incoming_valid_)
       return;
-    on_outgoing_data();
+    if (on_outgoing_data())
+      outgoing_apply_backpressure();
     break;
   default:
     LOG(FATAL) << this << ": outgoing_read_cb() Invalid state: " << state_string();
@@ -713,7 +716,7 @@ void Socks5Server::Session::outgoing_read_cb() {
 
 void Socks5Server::Session::outgoing_write_cb() {
   if (state_ == State::kCONNECTING || state_ == State::kESTABLISHED)
-    on_outgoing_drained();
+    outgoing_apply_backpressure();
   else if (state_ == State::kFLUSHING_OUTGOING && on_outgoing_flush()) {
     LOG(INFO) << this << ": Session closed";
     server_.close_session(this);
@@ -769,6 +772,64 @@ bool Socks5Server::Session::outgoing_connect() {
 
   state_ = State::kCONNECTING;
   return true;
+}
+
+void Socks5Server::Session::incoming_apply_backpressure() {
+  if (state_ != State::kESTABLISHED || !incoming_valid_ || !outgoing_valid_)
+    return;
+
+  const struct evbuffer* inc_buf = ::bufferevent_get_input(incoming_);
+  const size_t inc_len = ::evbuffer_get_length(inc_buf);
+
+  const struct evbuffer* out_buf = ::bufferevent_get_output(outgoing_);
+  const size_t out_len = ::evbuffer_get_length(out_buf);
+
+  LOG(DEBUG) << this << ": Outgoing write buffer: " << out_len;
+
+  if (out_len > kMaxBufferSize) {
+    if (0 != (::bufferevent_get_enabled(incoming_) & EV_READ)) {
+      LOG(DEBUG) << this << ": Throttling incoming->outgoing";
+      ::bufferevent_disable(incoming_, EV_READ);
+      ::bufferevent_setwatermark(outgoing_, EV_WRITE, kMaxBufferSize / 2, 0);
+    }
+  } else {
+    if (0 == (::bufferevent_get_enabled(incoming_) & EV_READ)) {
+      LOG(DEBUG) << this << ": Unthrottling incoming->outgoing";
+      ::bufferevent_enable(incoming_, EV_READ);
+      ::bufferevent_setwatermark(outgoing_, EV_WRITE, 0, 0);
+      if (inc_len > 0)
+        on_incoming_data();
+    }
+  }
+}
+
+void Socks5Server::Session::outgoing_apply_backpressure() {
+  if (state_ != State::kESTABLISHED || !incoming_valid_ || !outgoing_valid_)
+    return;
+
+  const struct evbuffer* out_buf = ::bufferevent_get_input(outgoing_);
+  const size_t out_len = ::evbuffer_get_length(out_buf);
+
+  const struct evbuffer* inc_buf = ::bufferevent_get_output(incoming_);
+  const size_t inc_len = ::evbuffer_get_length(inc_buf);
+
+  LOG(DEBUG) << this << ": Incoming write buffer: " << inc_len;
+
+  if (inc_len > kMaxBufferSize) {
+    if (0 != (::bufferevent_get_enabled(outgoing_) & EV_READ)) {
+      LOG(DEBUG) << this << ": Throttling outging->incoming";
+      ::bufferevent_disable(outgoing_, EV_READ);
+      ::bufferevent_setwatermark(incoming_, EV_WRITE, kMaxBufferSize / 2, 0);
+    }
+  } else {
+    if (0 == (::bufferevent_get_enabled(outgoing_) & EV_READ)) {
+      LOG(DEBUG) << this << ": Unthrottling outgoing->incoming";
+      ::bufferevent_enable(outgoing_, EV_READ);
+      ::bufferevent_setwatermark(incoming_, EV_WRITE, 0, 0);
+      if (out_len > 0)
+        on_outgoing_data();
+    }
+  }
 }
 
 } // namespace schwanenlied

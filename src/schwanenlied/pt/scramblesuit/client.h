@@ -108,13 +108,13 @@ class Client : public Socks5Server::Session {
                               const uint8_t* passwd,
                               const uint8_t plen) override;
 
-  void on_outgoing_connected() override;
+  bool on_outgoing_connected() override;
 
-  void on_incoming_data() override;
+  bool on_incoming_data() override;
 
-  void on_outgoing_data_connecting() override;
+  bool on_outgoing_data_connecting() override;
 
-  void on_outgoing_data() override;
+  bool on_outgoing_data() override;
 
 #ifdef ENABLE_SCRAMBLESUIT_IAT
   bool on_outgoing_flush() override;
@@ -181,8 +181,11 @@ class Client : public Socks5Server::Session {
    * Inter-Arrivial Time obfuscation TX timer callback
    *
    * @param[in] send_all  Send the entire buffer
+   *
+   * @returns true  - Success
+   * @returns false - Failure (Object destroyed)
    */
-  void on_iat_transmit(const bool send_all=false);
+  bool on_iat_transmit(const bool send_all=false);
 
   /**
    * Encode and send an outgoing ScrambleSuit frame

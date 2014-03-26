@@ -66,7 +66,7 @@ namespace schwanenlied {
  *  * Attempting to flush queued data when either of the connections is closed
  *
  * Current limitations:
- *  * It will *ALWAYS* bind to <IPv4 loopback address>:RandomPort
+ *  * It will *ALWAYS* bind to "IPv4 loopback address":RandomPort
  *  * Only CONNECT (establish TCP/IP stream) is supported
  *  * Only ATYP 0x01/0x03 are supported (no FQDN)
  *  * GSSAPI auth will never be supported
@@ -146,23 +146,37 @@ class Socks5Server {
       return false;
     }
 
-    /** Remote peer connection established callback */
-    virtual void on_outgoing_connected() = 0;
+    /**
+     * Remote peer connection established callback
+     *
+     * @returns true  - Success
+     * @returns false - Failure (Object destroyed)
+     */
+    virtual bool on_outgoing_connected() = 0;
 
-    /** Client to SOCKS Server data received callback */
-    virtual void on_incoming_data() = 0;
+    /**
+     * Client to SOCKS Server data received callback
+     *
+     * @returns true  - Success
+     * @returns false - Failure (Object destroyed)
+     */
+    virtual bool on_incoming_data() = 0;
 
-    /** SOCKS Server to Client write queue empty callback */
-    virtual void on_incoming_drained() {}
+    /**
+     * Client to SOCKS Server data received callback (State::kCONNECTING)
+     *
+     * @returns true  - Success
+     * @returns false - Failure (Object destroyed)
+     */
+    virtual bool on_outgoing_data_connecting() = 0;
 
-    /** Client to SOCKS Server data received callback (State::kCONNECTING) */
-    virtual void on_outgoing_data_connecting() = 0;
-
-    /** Remote peer to SOCKS Server data received callback */
-    virtual void on_outgoing_data() = 0;
-
-    /** SOCKS Server to Remote peer write queue empty callback */
-    virtual void on_outgoing_drained() {}
+    /**
+     * Remote peer to SOCKS Server data received callback
+     *
+     * @returns true  - Success
+     * @returns false - Failure (Object destroyed)
+     */
+    virtual bool on_outgoing_data() = 0;
 
     /**
      * SOCKS Server to Remote peer flush callback (State::kFLUSHING_OUTGOING)
@@ -279,6 +293,8 @@ class Socks5Server {
 
     /** The State::kCONNECTING timeout in seconds */
     static constexpr int kConnectTimeout = 60;
+    /** The maximum amount of data to buffer before throttling */
+    static constexpr size_t kMaxBufferSize = 65536;
 
     const bool auth_required_;  /**< Client must authenticate? */
     const bool scrub_addrs_;    /**< Should scrub addresses when logging? */
@@ -334,6 +350,14 @@ class Socks5Server {
      * @returns false - Critical failure
      */
     bool outgoing_connect();
+    /** @} */
+
+    /** @{ */
+    /** Apply backpressure to incoming if needed */
+    void incoming_apply_backpressure();
+
+    /** Apply backpressure to outgoing if needed */
+    void outgoing_apply_backpressure();
     /** @} */
   };
 

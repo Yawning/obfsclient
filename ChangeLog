@@ -1,11 +1,13 @@
 Changes in version 0.0.2 - UNRELEASED
+ - Apply pushback between each side of the proxied connection to limit the
+   amount of data that can be buffered.  This fixes issue #3.
  - Use bufferevent_write_buffer to save allocating/copying in obfs2/obfs3.
    This fixes issue #24.
  - Fix assertions primarily seen on abrupt connection close by disabling all
    reads on transition into the various SOCKS5 FLUSHING states.
  - Cleaned up the logging, and log SOCKS5 assertions to the log file.
  - Send a TTL EXPIRED SOCKS5 error on connection timeouts.
- - Fixed an assertion  that occured if the outgoing connection immediately
+ - Fixed an assertion that occured if the outgoing connection immediately
    failed (Eg: Network interface being down).
  - Darwin build fixes, pointed out by Jeroen Massar.
  - FreeBSD 8.x/9.0 build fix, pointed out by Fabian Keil.

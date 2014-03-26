@@ -109,7 +109,7 @@ burn:
   return true;
 }
 
-void Client::on_outgoing_connected() {
+bool Client::on_outgoing_connected() {
   // Dump the initial probability tables
   LOG(DEBUG) << this << ": Packet length probabilities: "
              << packet_len_rng_.to_string();
@@ -123,11 +123,11 @@ void Client::on_outgoing_connected() {
   bool done = false;
   if (session_ticket_handshake_ == nullptr) {
     LOG(ERROR) << this << ": Failed to allocate Session Ticket Handshake";
-    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return send_socks5_response(Reply::kGENERAL_FAILURE);
   } else if (!session_ticket_handshake_->send_handshake_msg(done)) {
     // Something went horribly wrong and we couldn't send a ticket
     LOG(WARNING) << this << ": Initiator Session Ticket handshake failed";
-    send_socks5_response(Reply::kGENERAL_FAILURE);
+    return send_socks5_response(Reply::kGENERAL_FAILURE);
   } else if (done) {
     /*
      * The Session Ticket Handshake 'succeeds' immediately after sending a
@@ -139,6 +139,7 @@ void Client::on_outgoing_connected() {
      */
     LOG(INFO) << this << ": Session Ticket handshake sent";
     handshake_ = HandshakeMethod::kSESSION_TICKET;
+    return true;
   } else {
     // UniformDH handshake
     handshake_ = HandshakeMethod::kUNIFORM_DH;
@@ -146,22 +147,22 @@ void Client::on_outgoing_connected() {
         new UniformDHHandshake(*this, shared_secret_));
     if (uniformdh_handshake_ == nullptr) {
       LOG(ERROR) << this << ": Failed to allocate UniformDH Handshake";
-      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return send_socks5_response(Reply::kGENERAL_FAILURE);
     } else if (!uniformdh_handshake_->send_handshake_msg()) {
       LOG(WARNING) << this << ": Initiator UniformDH handshake failed";
-      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return send_socks5_response(Reply::kGENERAL_FAILURE);
     }
+    return true;
   }
 }
 
-void Client::on_incoming_data() {
-  if (state_ != State::kESTABLISHED)
-    return;
+bool Client::on_incoming_data() {
+  SL_ASSERT(state_ == State::kESTABLISHED);
 
   struct evbuffer* buf = ::bufferevent_get_input(incoming_);
   size_t len = ::evbuffer_get_length(buf);
   if (len == 0)
-    return;
+    return true;
 
   LOG(DEBUG) << this << ": on_incoming_data(): Have " << len << " bytes";
 
@@ -169,15 +170,17 @@ void Client::on_incoming_data() {
   // Schedule the next transmit
   if (!schedule_iat_transmit()) {
     server_.close_session(this);
-    return;
+    return false;
   }
+
+  return true;
 #else
   // Transmit the entire buffer
-  on_iat_transmit(true);
+  return on_iat_transmit(true);
 #endif
 }
 
-void Client::on_outgoing_data_connecting() {
+bool Client::on_outgoing_data_connecting() {
   SL_ASSERT(state_ == State::kCONNECTING);
 
   if (handshake_ == HandshakeMethod::kSESSION_TICKET) {
@@ -197,29 +200,32 @@ void Client::on_outgoing_data_connecting() {
        * Manually invoke the callback that caused this one to get triggered in
        * the first place.
        */
-      on_outgoing_data();
+      return on_outgoing_data();
     }
+
+    return true;
   } else if (handshake_ == HandshakeMethod::kUNIFORM_DH) {
     // UniformDH handshake
     SL_ASSERT(uniformdh_handshake_ != nullptr);
     bool done = false;
     if (!uniformdh_handshake_->recv_handshake_msg(done)) {
       LOG(WARNING) << this << ": UniformDH handshake failed";
-      send_socks5_response(Reply::kGENERAL_FAILURE);
+      return send_socks5_response(Reply::kGENERAL_FAILURE);
     } else if (done) {
       // Free up the UniformDH keypair (dtor won't be called for a while)
       uniformdh_handshake_.reset(nullptr);
 
       LOG(INFO) << this << ": Finished UniformDH handshake";
-      send_socks5_response(Reply::kSUCCEDED);
+      return send_socks5_response(Reply::kSUCCEDED);
     }
+
+    return true;
   } else
     SL_ABORT("Unknown handshake type");
 }
 
-void Client::on_outgoing_data() {
-  if (state_ != State::kESTABLISHED)
-    return;
+bool Client::on_outgoing_data() {
+  SL_ASSERT(state_ == State::kESTABLISHED);
 
   struct evbuffer* buf = ::bufferevent_get_input(outgoing_);
   size_t len = ::evbuffer_get_length(buf);
@@ -229,7 +235,7 @@ void Client::on_outgoing_data() {
       // Attempt to read said header
       SL_ASSERT(decode_buf_len_ == 0);
       if (len < kHeaderLength)
-        return;
+        return true;
 
       // Copy the header into the decode buffer
       if (static_cast<int>(kHeaderLength) != ::evbuffer_remove(buf,
@@ -237,7 +243,7 @@ void Client::on_outgoing_data() {
                                                                kHeaderLength)) {
         LOG(ERROR) << this << ": Failed to read frame header";
         server_.close_session(this);
-        return;
+        return false;
       }
       decode_buf_len_ += kHeaderLength;
       len -= kHeaderLength;
@@ -246,13 +252,13 @@ void Client::on_outgoing_data() {
       if (!responder_hmac_.init()) {
         LOG(ERROR) << this << ": Failed to init RX frame MAC";
         server_.close_session(this);
-        return;
+        return false;
       }
       if (!responder_hmac_.update(decode_buf_.data() + kDigestLength,
                                   kHeaderLength - kDigestLength)) {
         LOG(ERROR) << this << ": Failed to MAC RX frame header";
         server_.close_session(this);
-        return;
+        return false;
       }
 
       // Decrypt the header
@@ -261,7 +267,7 @@ void Client::on_outgoing_data() {
                                   decode_buf_.data() + kDigestLength)) {
         LOG(ERROR) << this << ": Failed to decrypt frame header";
         server_.close_session(this);
-        return;
+        return false;
       }
 
       // Validate that the lengths are sane
@@ -270,18 +276,18 @@ void Client::on_outgoing_data() {
       if (decode_total_len_ > kMaxPayloadLength) {
         LOG(WARNING) << this << ": Total length oversized: " << decode_total_len_;
         server_.close_session(this);
-        return;
+        return false;
       }
       if (decode_payload_len_ > kMaxPayloadLength) {
         LOG(WARNING) << this << ": Payload length oversized: " << decode_payload_len_;
         server_.close_session(this);
-        return;
+        return false;
       }
       if (decode_total_len_ < decode_payload_len_) {
         LOG(WARNING) << this << ": Payload longer than frame: "
                      << decode_total_len_ << " < " << decode_payload_len_;
         server_.close_session(this);
-        return;
+        return false;
       }
 
       decode_state_ = FrameDecodeState::kREAD_PAYLOAD;
@@ -289,7 +295,7 @@ void Client::on_outgoing_data() {
 
     // This can be reached after processing a header, ensure that data exists
     if (len == 0)
-      return;
+      return true;
 
     SL_ASSERT(decode_state_ == FrameDecodeState::kREAD_PAYLOAD);
     const int to_process = ::std::min(decode_total_len_ - (decode_buf_len_ - 
@@ -301,7 +307,7 @@ void Client::on_outgoing_data() {
                                         decode_buf_len_, to_process)) {
       LOG(ERROR) << this << ": Failed to read frame payload";
       server_.close_session(this);
-      return;
+      return false;
     }
 
     // MAC the encrypted payload
@@ -309,7 +315,7 @@ void Client::on_outgoing_data() {
                                 to_process)) {
       LOG(ERROR) << this << ": Failed to MAC RX frame payload";
       server_.close_session(this);
-      return;
+      return false;
     }
     decode_buf_len_ += to_process;
     len -= to_process;
@@ -320,12 +326,12 @@ void Client::on_outgoing_data() {
       if (!responder_hmac_.final(digest.data(), digest.size())) {
         LOG(ERROR) << this << ": Failed to finalize RX frame MAC";
         server_.close_session(this);
-        return;
+        return false;
       }
       if (!crypto::memequals(decode_buf_.data(), digest.data(), digest.size())) {
         LOG(ERROR) << this << ": RX frame MAC mismatch";
         server_.close_session(this);
-        return;
+        return false;
       }
 
       // Decrypt
@@ -334,7 +340,7 @@ void Client::on_outgoing_data() {
                                   decode_buf_.data() + kHeaderLength)) {
         LOG(ERROR) << this << ": Failed to decrypt frame payload";
         server_.close_session(this);
-        return;
+        return false;
       }
 
       LOG(DEBUG) << this << ": Received " << kHeaderLength << " + "
@@ -350,7 +356,7 @@ void Client::on_outgoing_data() {
                                        kHeaderLength, decode_payload_len_)) {
             LOG(ERROR) << this << ": Failed to send remote payload";
             server_.close_session(this);
-            return;
+            return false;
           }
           break;
         case PacketFlags::kPRNG_SEED:
@@ -391,6 +397,8 @@ void Client::on_outgoing_data() {
     } else
       SL_ASSERT(decode_buf_len_ < kHeaderLength + kMaxPayloadLength);
   }
+
+  return true;
 }
 
 #ifdef ENABLE_SCRAMBLESUIT_IAT
@@ -489,14 +497,14 @@ bool Client::schedule_iat_transmit() {
 }
 #endif
 
-void Client::on_iat_transmit(const bool send_all) {
+bool Client::on_iat_transmit(const bool send_all) {
   if (state_ != State::kESTABLISHED && state_ != State::kFLUSHING_OUTGOING)
-    return;
+    return false;
 
   struct evbuffer* buf = ::bufferevent_get_input(incoming_);
   size_t len = ::evbuffer_get_length(buf);
   if (len == 0)
-    return;
+    return true;
 
   LOG(DEBUG) << this << ": on_iat_transmit(): Have " << len << " bytes";
 
@@ -506,7 +514,7 @@ void Client::on_iat_transmit(const bool send_all) {
     if (p == nullptr) {
       LOG(ERROR) << this << ": Failed to pullup buffer";
       server_.close_session(this);
-      return;
+      return false;
     }
 
     size_t pad_len = 0;
@@ -531,12 +539,12 @@ void Client::on_iat_transmit(const bool send_all) {
       // XXX: In theory, it's possible to incrementally send padding as well?
       if (!send_outgoing_frame(p, frame_payload_len, pad_len - kHeaderLength)) {
         server_.close_session(this);
-        return;
+        return false;
       }
       pad_len = 0;
     } else if (!send_outgoing_frame(p, frame_payload_len, 0)) {
       server_.close_session(this);
-      return;
+      return false;
     }
 
     // Remove the processed payload from the rx queue
@@ -547,16 +555,16 @@ void Client::on_iat_transmit(const bool send_all) {
     if (pad_len > kHeaderLength) {
       if (!send_outgoing_frame(nullptr, 0, pad_len - kHeaderLength)) {
         server_.close_session(this);
-        return;
+        return false;
       }
     } else if (pad_len > 0) {
       if (!send_outgoing_frame(nullptr, 0, kMaxPayloadLength - kHeaderLength)) {
         server_.close_session(this);
-        return;
+        return false;
       }
       if (!send_outgoing_frame(nullptr, 0, pad_len)) {
         server_.close_session(this);
-        return;
+        return false;
       }
     }
   } while (send_all && len > 0);
@@ -565,11 +573,13 @@ void Client::on_iat_transmit(const bool send_all) {
   if (len > 0) {
     if (!schedule_iat_transmit()) {
       server_.close_session(this);
-      return;
+      return false;
     }
   } else
     LOG(DEBUG) << this << ": IAT TX buffer drained";
 #endif
+
+  return true;
 }
 
 bool Client::send_outgoing_frame(const uint8_t* buf,

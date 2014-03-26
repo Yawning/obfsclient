@@ -91,13 +91,13 @@ class Client : public Socks5Server::Session {
   ~Client() = default;
 
  protected:
-  void on_outgoing_connected() override;
+  bool on_outgoing_connected() override;
 
-  void on_incoming_data() override;
+  bool on_incoming_data() override;
 
-  void on_outgoing_data_connecting() override;
+  bool on_outgoing_data_connecting() override;
 
-  void on_outgoing_data() override;
+  bool on_outgoing_data() override;
 
  private:
   Client(const Client&) = delete;
