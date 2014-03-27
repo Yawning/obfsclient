@@ -479,11 +479,9 @@ bool Client::schedule_iat_transmit() {
     }
   }
 
-  // If the IAT timer is pending, then return (Should never happen)
-  if (evtimer_pending(iat_timer_ev_, NULL)) {
-    LOG(DEBUG) << this << ": schedule_iat_transmit() called when pending?";
+  // If the IAT timer is pending, then return
+  if (evtimer_pending(iat_timer_ev_, NULL))
     return true;
-  }
 
   // Schedule the next transmit based off the RNG
   struct timeval tv;
