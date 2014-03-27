@@ -1,4 +1,6 @@
 Changes in version 0.0.2 - UNRELEASED
+ - Change the command line arguments to match the obfsproxy counterparts.
+   This fixes issue #31.
  - Apply pushback between each side of the proxied connection to limit the
    amount of data that can be buffered.  This fixes issue #3.
  - Use bufferevent_write_buffer to save allocating/copying in obfs2/obfs3.

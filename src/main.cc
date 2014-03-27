@@ -57,27 +57,66 @@ _INITIALIZE_EASYLOGGINGPP
 
 namespace {
 
+enum class LogLevel {
+  kINVALID,
+  kDEBUG,
+  kINFO,
+  kWARNING,
+  kERROR
+};
+
+const LogLevel get_loglevel(const ::std::string& level) {
+  if (level.compare("debug") == 0)
+    return LogLevel::kDEBUG;
+  else if (level.compare("info") == 0)
+    return LogLevel::kINFO;
+  else if (level.compare("warning") == 0)
+    return LogLevel::kWARNING;
+  else if (level.compare("error") == 0)
+    return LogLevel::kERROR;
+  return LogLevel::kINVALID;
+}
+
+/** Validator for log level */
+::option::ArgStatus LogLevelValidator(const ::option::Option& option, bool msg) {
+  if (option.arg != nullptr && option.arg[0] != '\0') {
+    if (get_loglevel(::std::string(option.arg)) != LogLevel::kINVALID)
+      return ::option::ARG_OK;
+  }
+
+  if (msg)
+    ::std::cerr << "Error: " << option.name
+                << " must be one of error, warning, info, debug."
+                << ::std::endl;
+
+  return ::option::ARG_ILLEGAL;
+}
+
 enum kOptionIndex {
   kUNKNOWN,
   kHELP,
   kVERSION,
-  kDEBUG,
-  kUNSAFE_LOGS,
+  kLOG_MIN_SEVERITY,
+  kNO_LOG,
+  kNO_SAFE_LOGGING,
   kWAIT_FOR_DEBUGGER
 };
 
 const ::option::Descriptor kUsage[] = {
   { kUNKNOWN, 0, "", "", ::option::Arg::None,
-    "usage: obfsclient [OPTION]" },
-  { kHELP, 0, "", "help", ::option::Arg::Optional,
-    "  --help              Print usage." },
-  { kVERSION, 0, "", "version", ::option::Arg::Optional,
-    "  --version           Print version." },
-  { kDEBUG, 0, "", "debug", ::option::Arg::Optional,
-    "  --debug             Enable debugging." },
-  { kUNSAFE_LOGS, 0, "", "unsafe-logs", ::option::Arg::Optional,
-    "  --unsafe-logs       Unsafe logging." },
-  { kWAIT_FOR_DEBUGGER, 0, "", "wait-for-debugger", ::option::Arg::Optional,
+    "usage: obfsclient [OPTIONS]\n" },
+  { kHELP, 0, "h", "help", ::option::Arg::None,
+    "  -h, --help          Print usage." },
+  { kVERSION, 0, "v", "version", ::option::Arg::None,
+    "  -v, --version       Print version." },
+  { kLOG_MIN_SEVERITY, 0, "", "log-min-severity", LogLevelValidator,
+    "  --log-min-severity {error,warning,info,debug}\n"
+    "                      Set minimum logging severity (default: info)." },
+  { kNO_LOG, 0, "", "no-log", ::option::Arg::None,
+    "  --no-log            Disable logging." },
+  { kNO_SAFE_LOGGING, 0, "", "no-safe-logging", ::option::Arg::None,
+    "  --no-safe-logging   Disable safe (scrubbed address) logging." },
+  { kWAIT_FOR_DEBUGGER, 0, "", "wait-for-debugger", ::option::Arg::None,
     "  --wait-for-debugger Sleep after parsing command line args." },
   { 0, 0, nullptr, nullptr, 0, nullptr }
 };
@@ -109,18 +148,37 @@ bool init_statedir(const allium_ptcfg* cfg,
   return true;
 }
 
+
 void init_logging(const ::std::string& path,
-                  const bool debug) {
+                  const bool enabled,
+                  const LogLevel min_log_level) {
   ::el::Configurations conf;
 
   conf.setToDefault();
   conf.setGlobally(::el::ConfigurationType::ToStandardOutput, "false");
-  conf.setGlobally(::el::ConfigurationType::Filename,
-                   path + ::std::string(kLogFileName));
   conf.set(::el::Level::Debug, ::el::ConfigurationType::Format,
            "%datetime %level [%logger] %msg");
-  if (!debug)
-    conf.set(::el::Level::Debug, ::el::ConfigurationType::Enabled, "false");
+  conf.set(::el::Level::Global, ::el::ConfigurationType::Enabled, "false");
+
+  if (enabled) {
+    conf.setGlobally(::el::ConfigurationType::Filename,
+                     path + ::std::string(kLogFileName));
+
+    /* Set the log level */
+    switch(min_log_level) {
+    case LogLevel::kDEBUG:
+      conf.set(::el::Level::Debug, ::el::ConfigurationType::Enabled, "true");
+    case LogLevel::kINFO:
+      conf.set(::el::Level::Info, ::el::ConfigurationType::Enabled, "true");
+    case LogLevel::kWARNING:
+      conf.set(::el::Level::Warning, ::el::ConfigurationType::Enabled, "true");
+    case LogLevel::kERROR:
+      conf.set(::el::Level::Error, ::el::ConfigurationType::Enabled, "true");
+    default:
+      conf.set(::el::Level::Fatal, ::el::ConfigurationType::Enabled, "true");
+    }
+  }
+
   ::el::Helpers::addFlag(el::LoggingFlag::ImmediateFlush);
   ::el::Loggers::setDefaultConfigurations(conf, true);
   (void)::el::Loggers::getLogger(_LOGGER);
@@ -206,8 +264,11 @@ int main(int argc, char* argv[]) {
     ::std::cout << PACKAGE_NAME << " " << PACKAGE_VERSION << ::std::endl;
     return 0;
   }
-  const bool debug = options[kDEBUG];
-  const bool scrub_ips = !options[kUNSAFE_LOGS];
+  const bool enable_logs = !options[kNO_LOG];
+  const LogLevel min_log_level = options[kLOG_MIN_SEVERITY] != nullptr ?
+      get_loglevel(::std::string(options[kLOG_MIN_SEVERITY].arg)) :
+      LogLevel::kINFO;
+  const bool scrub_ips = !options[kNO_SAFE_LOGGING];
   volatile bool wait_for_debugger = options[kWAIT_FOR_DEBUGGER];
   delete[] options;
   delete[] buffer;
@@ -234,7 +295,7 @@ int main(int argc, char* argv[]) {
     ::allium_ptcfg_free(cfg);
     return -1;
   }
-  init_logging(state_dir, debug);
+  init_logging(state_dir, enable_logs, min_log_level);
 
   // Log a banner
   LOG(INFO) << "obfsclient " << PACKAGE_VERSION
