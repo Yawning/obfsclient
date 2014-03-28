@@ -14,9 +14,9 @@ This is a C++11 client implementation of the following protocols:
  * [ScrambleSuit](https://github.com/NullHypothesis/scramblesuit/blob/master/doc/scramblesuit-spec.txt) - *EXPERIMENTAL*
    * This requires tor-0.2.5.x or later for Pluggable Transport arguments.
 
-By design will only function as a ClientTransportPlugin for Tor.  It does use a
-reasonably complete implementation of the Pluggable Transport spec so when used
-properly, it will function as a drop in replacement for asn's Python
+By design it will only function as a ClientTransportPlugin for Tor.  It does use
+a reasonably complete implementation of the Pluggable Transport spec so when
+used properly, it will function as a drop in replacement for asn's Python
 implementation.
 
 ### Building
