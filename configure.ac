@@ -4,7 +4,7 @@
 #
 
 AC_INIT([obfsclient],
-	[0.0.1],
+	[0.0.2],
 	[yawning at schwanenlied dot me],
 	[obfsclient],
 	[https://github.com/Yawning/obfsclient])

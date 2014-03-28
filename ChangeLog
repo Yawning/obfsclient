@@ -1,4 +1,4 @@
-Changes in version 0.0.2 - UNRELEASED
+Changes in version 0.0.2 - 2014-03-28
  - Change the command line arguments to match the obfsproxy counterparts.
    This fixes issue #31.
  - Apply pushback between each side of the proxied connection to limit the
