@@ -6,7 +6,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
 ACLOCAL_AMFLAGS = ${ACLOCAL_FLAGS} -I m4
 
-AM_CXXFLAGS = -Wall -Werror -fno-exceptions -fno-rtti ${PTHREAD_CFLAGS}
+AM_CXXFLAGS = -Wall -Wextra -Wno-missing-field-initializers -Werror -fno-exceptions -fno-rtti ${PTHREAD_CFLAGS}
 
 common_sources = src/schwanenlied/crypto/base32.cc \
 	src/schwanenlied/crypto/hkdf_sha256.cc \

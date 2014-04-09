@@ -124,7 +124,7 @@ class Ctr {
   /**
    * Is the state initialized?
    */
-  const bool has_state() const { return has_state_; }
+  bool has_state() const { return has_state_; }
   /** @} */
 
   /**

@@ -48,7 +48,7 @@ Socks5Server::~Socks5Server() {
   close_sessions();
 }
 
-const bool Socks5Server::addr(struct sockaddr_in& addr) const {
+bool Socks5Server::addr(struct sockaddr_in& addr) const {
   if (listener_ == nullptr)
     return false;
 
@@ -72,6 +72,8 @@ bool Socks5Server::bind() {
                             struct sockaddr* addr,
                             int len,
                             void* ptr) {
+    (void)listener;
+
     reinterpret_cast<Socks5Server*>(ptr)->on_new_connection(sock, addr, len);
   };
 
@@ -131,6 +133,8 @@ void Socks5Server::close_sessions() {
 void Socks5Server::on_new_connection(evutil_socket_t sock,
                                      struct sockaddr* addr,
                                      int addr_len) {
+  (void)addr_len;
+
   // Don't bother scrubbing the client address (loopback)
   ::std::string client_addr = addr_to_string(addr, false);
 
@@ -173,15 +177,21 @@ Socks5Server::Session::Session(Socks5Server& server,
   // Initialize the callbacks for the incoming socket
   bufferevent_data_cb readcb = [](struct bufferevent *bev,
                                   void *ctx) {
+    (void)bev;
+
     reinterpret_cast<Session*>(ctx)->incoming_read_cb();
   };
   bufferevent_data_cb writecb = [](struct bufferevent *bev,
                                    void *ctx) {
+    (void)bev;
+
     reinterpret_cast<Session*>(ctx)->incoming_write_cb();
   };
   bufferevent_event_cb eventcb = [](struct bufferevent *bev,
                                     short events,
                                     void *ctx) {
+    (void)bev;
+
     reinterpret_cast<Session*>(ctx)->incoming_event_cb(events);
   };
   ::bufferevent_setcb(incoming_, readcb, writecb, eventcb, this);
@@ -649,6 +659,9 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     event_callback_fn timeoutcb = [](evutil_socket_t sock,
                                      short which,
                                      void* arg) {
+      (void)sock;
+      (void)which;
+
       reinterpret_cast<Session*>(arg)->connect_timeout_cb();
     };
     SL_ASSERT(connect_timer_ev_ == nullptr);
@@ -671,15 +684,21 @@ void Socks5Server::Session::outgoing_connect_cb(const short events) {
     // Setup the bufferevents
     bufferevent_data_cb readcb = [](struct bufferevent* bev,
                                     void* ctx) {
+      (void)bev;
+
       reinterpret_cast<Session*>(ctx)->outgoing_read_cb();
     };
     bufferevent_data_cb writecb = [](struct bufferevent* bev,
                                      void* ctx) {
+      (void)bev;
+
       reinterpret_cast<Session*>(ctx)->outgoing_write_cb();
     };
     bufferevent_event_cb eventcb = [](struct bufferevent* bev,
                                       short events,
                                       void* ctx) {
+      (void)bev;
+
       reinterpret_cast<Session*>(ctx)->outgoing_event_cb(events);
     };
     ::bufferevent_enable(outgoing_, EV_READ | EV_WRITE);
@@ -761,6 +780,8 @@ bool Socks5Server::Session::outgoing_connect() {
   bufferevent_event_cb eventcb = [](struct bufferevent *bev,
                                     short events,
                                     void *ctx) {
+    (void)bev;
+
     reinterpret_cast<Session*>(ctx)->outgoing_connect_cb(events);
   };
   ::bufferevent_setcb(outgoing_, nullptr, nullptr, eventcb, this);

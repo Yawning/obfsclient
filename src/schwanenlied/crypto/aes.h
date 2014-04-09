@@ -111,7 +111,7 @@ class AesEcb {
   /**
    * Is the key set?
    */
-  const bool has_key() const { return has_key_; }
+  bool has_key() const { return has_key_; }
   /** @} */
 
   /**

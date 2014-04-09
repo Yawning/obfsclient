@@ -89,7 +89,7 @@ class SessionTicketHandshake {
     const crypto::SecureBuffer& ticket() const { return ticket_; }
 
     /** Return the ticket issue time */
-    const time_t time() const { return time_; }
+    time_t time() const { return time_; }
 
     /** Encode k_t | T via Base32 */
     ::std::string to_string() const;

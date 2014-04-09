@@ -150,6 +150,8 @@ bool SessionTicketHandshake::send_handshake_msg(bool& is_done) {
 
 Ticket* TicketStore::get(const struct sockaddr* addr,
                          const socklen_t addr_len) {
+  (void)addr_len;
+
   auto iter = tickets_.find(Socks5Server::addr_to_string(addr, false));
   if (iter == tickets_.end())
     return nullptr;
@@ -173,6 +175,8 @@ void TicketStore::set(const struct sockaddr* addr,
                       const uint8_t* buf,
                       const size_t len,
                       const bool do_write) {
+  (void)addr_len;
+
   // Enforce uniqueness
   const auto key = Socks5Server::addr_to_string(addr, false);
   auto iter = tickets_.find(key);

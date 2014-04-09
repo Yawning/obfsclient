@@ -143,6 +143,11 @@ class Socks5Server {
                                         const uint8_t ulen,
                                         const uint8_t* passwd,
                                         const uint8_t plen) {
+      (void)uname;
+      (void)ulen;
+      (void)passwd;
+      (void)plen;
+
       return false;
     }
 
@@ -429,7 +434,7 @@ class Socks5Server {
    * @returns true  - The Socks5Server is listening
    * @returns false - The Socks5Server is not listening (Call bind())
    */
-  const bool addr(struct sockaddr_in& addr) const;
+  bool addr(struct sockaddr_in& addr) const;
   /** @} */
 
   /** @{ */

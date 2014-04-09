@@ -1,3 +1,7 @@
+Changes in version 0.0.3 - UNRELEASED
+ - Fix issues found by -Wextra, and start building with that option by
+   default.
+
 Changes in version 0.0.2 - 2014-03-28
  - Change the command line arguments to match the obfsproxy counterparts.
    This fixes issue #31.

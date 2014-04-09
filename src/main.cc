@@ -65,7 +65,7 @@ enum class LogLevel {
   kERROR
 };
 
-const LogLevel get_loglevel(const ::std::string& level) {
+LogLevel get_loglevel(const ::std::string& level) {
   if (level.compare("debug") == 0)
     return LogLevel::kDEBUG;
   else if (level.compare("info") == 0)
@@ -147,7 +147,6 @@ bool init_statedir(const allium_ptcfg* cfg,
   path.assign(tmp.get());
   return true;
 }
-
 
 void init_logging(const ::std::string& path,
                   const bool enabled,
@@ -327,6 +326,9 @@ int main(int argc, char* argv[]) {
     event_callback_fn cb = [](evutil_socket_t sock,
                               short which,
                               void* arg) {
+      (void)sock;
+      (void)which;
+
       ::std::list< ::std::unique_ptr<Socks5Server>>* servers =
           reinterpret_cast< ::std::list< ::std::unique_ptr<Socks5Server>>*>(arg);
       nr_sigints++;
