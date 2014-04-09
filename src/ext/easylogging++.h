@@ -1277,6 +1277,8 @@ class OS : base::StaticClass {
         return nullptr;
     }
 #endif  // _ELPP_OS_WINDOWS
+// XXX/Yawning - Holy shit, don't do this  (see comment@1253)
+#if 0
 #if _ELPP_OS_ANDROID
     /// @brief Reads android property value
     static inline char* getProperty(const char* prop) {
@@ -1300,6 +1302,7 @@ class OS : base::StaticClass {
         return ss.str();
     }
 #endif  // _ELPP_OS_ANDROID
+#endif
 
     /// @brief Runs command on terminal and returns the output.
     ///
