@@ -91,6 +91,8 @@ class Ctr {
       return false;
     if (ctr_len == 0)
       return false;
+    if ((iv == nullptr && iv_len != 0) || (iv != nullptr && iv_len == 0))
+      return false;
     if (ctr_len + iv_len != ecb_impl_.block_length())
       return false;
 
@@ -100,7 +102,8 @@ class Ctr {
       return false;
 
     iv_size_ = iv_len;
-    ::std::memcpy(&ctr_[0], iv, iv_len);
+    if (iv != nullptr)
+      ::std::memcpy(&ctr_[0], iv, iv_len);
     ::std::memcpy(&ctr_[iv_len], ctr, ctr_len);
 
     has_state_ = true;

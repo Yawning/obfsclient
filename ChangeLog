@@ -1,4 +1,6 @@
 Changes in version 0.0.3 - UNRELEASED
+ - Validate the IV parameters in ctr.h (conditional never triggered with
+   current use), found by clang's scan-build.
  - Fix easylogging++ not building on Android with -Werror.
  - Fix issues found by -Wextra, and start building with that option by
    default.
