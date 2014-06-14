@@ -1554,9 +1554,9 @@ inline bool Parser::workhorse(bool gnu, const Descriptor usage[], int numargs, c
 
     do // loop over short options in group, for long options the body is executed only once
     {
-      int idx;
+      int idx = 0;
 
-      const char* optarg;
+      const char* optarg = 0;
 
       /******************** long option **********************/
       if (handle_short_options == false || try_single_minus_longopt)
