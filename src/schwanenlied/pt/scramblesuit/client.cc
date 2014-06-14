@@ -468,8 +468,10 @@ bool Client::schedule_iat_transmit() {
   // Lazy timer initialization
   if (iat_timer_ev_ == nullptr) {
     event_callback_fn cb = [](evutil_socket_t sock,
-                              short witch,
+                              short which,
                               void* arg) {
+      (void)sock;
+      (void)which;
       reinterpret_cast<Client*>(arg)->on_iat_transmit();
     };
     iat_timer_ev_ = evtimer_new(base_, cb, this);
