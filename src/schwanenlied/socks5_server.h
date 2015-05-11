@@ -292,7 +292,7 @@ class Socks5Server {
     /** The SOCKSv5 address types */
     enum AddressType {
       kIPv4 = 0x01,       /**< IPv4 */
-      kDOMAINNAME = 0x02, /**< FQDN (Unsupported) */
+      kDOMAINNAME = 0x03, /**< FQDN (Unsupported) */
       kIPv6 = 0x04        /**< IPv6 */
     };
 
