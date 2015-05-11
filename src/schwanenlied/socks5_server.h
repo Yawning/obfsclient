@@ -68,7 +68,7 @@ namespace schwanenlied {
  * Current limitations:
  *  * It will *ALWAYS* bind to "IPv4 loopback address":RandomPort
  *  * Only CONNECT (establish TCP/IP stream) is supported
- *  * Only ATYP 0x01/0x03 are supported (no FQDN)
+ *  * Only ATYP 0x01/0x04 are supported (no FQDN)
  *  * GSSAPI auth will never be supported
  *
  * @warning Destroying the Socks5Server instance (or calling
